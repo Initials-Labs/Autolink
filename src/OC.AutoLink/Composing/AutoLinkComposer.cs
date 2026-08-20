@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OC.AutoLink.Api;
+using OC.AutoLink.Caching;
 using OC.AutoLink.Api.Security;
 using OC.AutoLink.Install;
 using OC.AutoLink.Linking;
@@ -27,6 +28,7 @@ public sealed class AutoLinkComposer : IComposer
             .AddOptions<AutoLinkOptions>()
             .Bind(builder.Config.GetSection(AutoLinkOptions.SectionName));
 
+        builder.Services.AddSingleton<IKeywordRegistryInvalidator, KeywordRegistryInvalidator>();
         builder.Services.AddSingleton<IKeywordMappingStore, KeywordMappingStore>();
         builder.Services.AddSingleton<IKeywordSuppressionStore, KeywordSuppressionStore>();
         builder.Services.AddSingleton<IAutoLinkScanner, AutoLinkScanner>();
@@ -50,15 +52,14 @@ public sealed class AutoLinkComposer : IComposer
         // Gives the package endpoints their own document at /umbraco/swagger.
         builder.Services.ConfigureOptions<ConfigureAutoLinkSwaggerGenOptions>();
 
+        // Carries our own table changes to every server, the way Umbraco carries content changes.
+        builder.CacheRefreshers().Add<AutoLinkCacheRefresher>();
+
         builder.PropertyValueConverters()
             .Replace<RteBlockRenderingValueConverter, AutoLinkRichTextValueConverter>();
 
         builder
-            .AddNotificationHandler<ContentPublishedNotification, KeywordRegistryInvalidationHandler>()
-            .AddNotificationHandler<ContentUnpublishedNotification, KeywordRegistryInvalidationHandler>()
-            .AddNotificationHandler<ContentDeletedNotification, KeywordRegistryInvalidationHandler>()
-            .AddNotificationHandler<ContentMovedNotification, KeywordRegistryInvalidationHandler>()
-            .AddNotificationHandler<ContentMovedToRecycleBinNotification, KeywordRegistryInvalidationHandler>()
+            .AddNotificationHandler<ContentCacheRefresherNotification, KeywordRegistryInvalidationHandler>()
             .AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, AutoLinkMigrationHandler>()
             .AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, AutoLinkSchemaInstaller>();
     }

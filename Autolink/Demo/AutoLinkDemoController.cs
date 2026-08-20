@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using OC.AutoLink;
+using OC.AutoLink.Caching;
 using OC.AutoLink.Models;
 using OC.AutoLink.Persistence;
 using OC.AutoLink.Registry;
@@ -33,6 +34,7 @@ public sealed class AutoLinkDemoController : ControllerBase
     private readonly IKeywordRegistry _registry;
     private readonly IOptionsMonitor<AutoLinkOptions> _options;
     private readonly IWebHostEnvironment _environment;
+    private readonly IKeywordRegistryInvalidator _invalidator;
     private readonly IKeywordMappingStore _mappingStore;
     private readonly IKeywordSuppressionStore _suppressionStore;
     private readonly IAutoLinkScanner _scanner;
@@ -52,6 +54,7 @@ public sealed class AutoLinkDemoController : ControllerBase
         ITagQuery tagQuery,
         IPublishedUrlProvider urlProvider,
         IKeywordMappingStore mappingStore,
+        IKeywordRegistryInvalidator invalidator,
         IContentTypeService contentTypeService,
         PropertyEditorCollection propertyEditors,
         IDataTypeService dataTypeService,
@@ -65,6 +68,7 @@ public sealed class AutoLinkDemoController : ControllerBase
         _propertyEditors = propertyEditors;
         _dataTypeService = dataTypeService;
         _mappingStore = mappingStore;
+        _invalidator = invalidator;
         _contentTypeService = contentTypeService;
         _tagQuery = tagQuery;
         _urlProvider = urlProvider;
@@ -235,7 +239,7 @@ public sealed class AutoLinkDemoController : ControllerBase
         }
 
         _suppressionStore.Suppress(keyword, pageKey, "demo harness", culture);
-        _registry.Invalidate();
+        _invalidator.InvalidateEverywhere();
 
         return Ok(new
         {
@@ -269,7 +273,7 @@ public sealed class AutoLinkDemoController : ControllerBase
         }
 
         bool removed = _suppressionStore.Allow(keyword, pageKey, culture);
-        _registry.Invalidate();
+        _invalidator.InvalidateEverywhere();
 
         return Ok(new { Keyword = keyword, Removed = removed, StampAfter = _registry.Current.Stamp });
     }
@@ -316,7 +320,7 @@ public sealed class AutoLinkDemoController : ControllerBase
         }
 
         _mappingStore.Save(keyword, KeywordDestination.Page(content.Key), "demo harness", culture);
-        _registry.Invalidate();
+        _invalidator.InvalidateEverywhere();
 
         _registry.Current.For(culture).Targets.TryGetValue(keyword, out var target);
 
@@ -351,7 +355,7 @@ public sealed class AutoLinkDemoController : ControllerBase
             "demo harness",
             culture);
 
-        _registry.Invalidate();
+        _invalidator.InvalidateEverywhere();
         _registry.Current.For(culture).Targets.TryGetValue(keyword, out var target);
 
         return Ok(new
@@ -375,7 +379,7 @@ public sealed class AutoLinkDemoController : ControllerBase
         }
 
         bool removed = _mappingStore.Delete(keyword, culture);
-        _registry.Invalidate();
+        _invalidator.InvalidateEverywhere();
 
         _registry.Current.For(culture).Targets.TryGetValue(keyword, out var target);
 
@@ -437,7 +441,7 @@ public sealed class AutoLinkDemoController : ControllerBase
             return NotFound();
         }
 
-        _registry.Invalidate();
+        _invalidator.InvalidateEverywhere();
         return Ok(new { Invalidated = true });
     }
 
