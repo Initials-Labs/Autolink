@@ -670,6 +670,12 @@ keyword on every page with it. Delete the property yourself if you want it gone.
 Deliberately not a button in the dashboard: a destructive action one click from the screen editors use every day is a
 mistake waiting to happen. The confirmation token exists for the same reason.
 
+**It needs an administrator, not just section access.** Every other endpoint here is gated on access to the
+Auto-linking section, which is the permission an editor settling keyword collisions holds — not the permission to drop
+both tables. So teardown carries a second policy requiring the admin group, and both apply: the administrator running
+it needs the section granted too, which is the same tick that let them open the dashboard. The token stops a mistake;
+it was never authorization.
+
 ### Accessibility
 
 The keyword list has **list semantics, not table roles**. It looks like a table, but each row contains its own detail
@@ -715,6 +721,22 @@ names its own subject, so it reads whether it follows "Not linked:" or "Another 
 | Delivery API | Delegated but not linked. Decide whether to support it or document it as out of scope. |
 | Accessibility, verified | The structure is sound, but nothing has been through a screen reader. |
 | Segments | `VariationContext` carries a segment as well as a culture; only culture is used. |
+| Narrowing what invalidates the registry | See below. Needs verifying against a real publish before it can be trusted. |
+
+#### Invalidation is wider than it looks
+
+`ContentCacheRefresherNotification` fires for **plain draft saves**, not just publishes: `ContentService.Save`
+raises a tree change, Umbraco's own handler turns that into `RefreshContentCache`, and that raises this
+notification. So saving a draft of any page marks the registry stale, and the next render pays for a rebuild whose
+content hash almost always comes out identical — the stamp does not move, so cached output survives, but the tags
+query and the URL resolution are done again for nothing.
+
+The payload (`ContentCacheRefresher.JsonPayload[]`) carries `ChangeTypes`, `PublishedCultures` and
+`UnpublishedCultures`, so the handler could invalidate only on a publish-state change. It is not done yet because
+getting it wrong fails in the direction that matters: a publish that does not invalidate is a keyword that never
+starts linking, which is the entire feature. This site has already been bitten twice by invariant content taking a
+different path from varying content, so the filter wants verifying against both before it ships — not reasoning
+about.
 
 ---
 

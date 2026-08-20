@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using OC.AutoLink.Api.Models;
-using OC.AutoLink.Caching;
 using OC.AutoLink.Models;
 using OC.AutoLink.Persistence;
 using OC.AutoLink.Registry;
@@ -15,16 +14,11 @@ namespace OC.AutoLink.Api.Controllers;
 public sealed class KeywordMappingController : AutoLinkControllerBase
 {
     private readonly IKeywordRegistry _registry;
-    private readonly IKeywordRegistryInvalidator _invalidator;
     private readonly IKeywordMappingStore _store;
 
-    public KeywordMappingController(
-        IKeywordRegistry registry,
-        IKeywordRegistryInvalidator invalidator,
-        IKeywordMappingStore store)
+    public KeywordMappingController(IKeywordRegistry registry, IKeywordMappingStore store)
     {
         _registry = registry;
-        _invalidator = invalidator;
         _store = store;
     }
 
@@ -122,10 +116,6 @@ public sealed class KeywordMappingController : AutoLinkControllerBase
 
         _store.Save(model.Keyword, destination, User.Identity?.Name, model.Culture ?? string.Empty);
 
-        // The stamp only moves if this actually changed where the keyword points, so re-saving the same
-        // decision costs a rebuild and nothing else.
-        _invalidator.InvalidateEverywhere();
-
         return Ok();
     }
 
@@ -143,11 +133,6 @@ public sealed class KeywordMappingController : AutoLinkControllerBase
         }
 
         bool removed = _store.Delete(keyword, culture ?? string.Empty);
-
-        if (removed)
-        {
-            _invalidator.InvalidateEverywhere();
-        }
 
         return Ok(new { removed });
     }

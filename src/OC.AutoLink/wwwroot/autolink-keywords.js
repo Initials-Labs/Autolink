@@ -505,12 +505,15 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 			skipped: pages.filter((state) => state === 'skipped').length,
 		};
 
+		// Derived once and passed down: the button's aria-controls and the panel's id have to be the same string.
+		const panelId = this.#panelId(row.keyword);
+
 		return html`
 			<div class="row ${row.hasConflict ? 'attention' : ''} ${open ? 'open' : ''}" role="listitem">
 				<button
 					class="caret"
 					aria-expanded=${open ? 'true' : 'false'}
-					aria-controls=${this.#panelId(row.keyword)}
+					aria-controls=${panelId}
 					aria-label=${open
 						? this.localize.term('ocAutoLink_hideDetail', row.keyword)
 						: this.localize.term('ocAutoLink_showDetail', row.keyword)}
@@ -554,16 +557,16 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 								)}`}
 				</span>
 
-				${when(open, () => this.#renderDetail(row, mentions))}
+				${when(open, () => this.#renderDetail(row, mentions, panelId))}
 			</div>
 		`;
 	}
 
-	#renderDetail(row, mentions) {
+	#renderDetail(row, mentions, panelId) {
 		return html`
 			<div
 				class="detail"
-				id=${this.#panelId(row.keyword)}
+				id=${panelId}
 				role="region"
 				aria-label=${this.localize.term('ocAutoLink_detailFor', row.keyword)}>
 				${this.#renderChoice(row)}
@@ -620,7 +623,7 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 
 		if (row.source === 'external') {
 			return html`<p class="chosen">
-				${this.localize.term('ocAutoLink_externalFor', row.mappingCulture)}
+				${this.localize.term('ocAutoLink_externalFor', this.#languageLabel(row.mappingCulture ?? ''))}
 				<uui-button
 					look="secondary"
 					color="danger"
@@ -635,8 +638,8 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 
 			return html`<p class="chosen">
 				${tagged
-					? this.localize.term('ocAutoLink_chosenFor', row.mappingCulture)
-					: this.localize.term('ocAutoLink_chosenNoTag', row.mappingCulture)}
+					? this.localize.term('ocAutoLink_chosenFor', this.#languageLabel(row.mappingCulture ?? ''))
+					: this.localize.term('ocAutoLink_chosenNoTag', this.#languageLabel(row.mappingCulture ?? ''))}
 				<uui-button
 					look="secondary"
 					label=${this.localize.term('ocAutoLink_undoChoice')}

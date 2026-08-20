@@ -58,12 +58,6 @@ internal static class TestLinker
     {
         var lookup = targets.ToDictionary(t => t.Keyword, StringComparer.OrdinalIgnoreCase);
 
-        var matchable = new HashSet<string>(lookup.Keys, StringComparer.OrdinalIgnoreCase);
-        foreach (KeywordConflict conflict in conflicts)
-        {
-            matchable.Add(conflict.Keyword);
-        }
-
         return new CultureKeywordSet(
             KeywordSnapshot.InvariantCulture,
             lookup,
@@ -72,7 +66,7 @@ internal static class TestLinker
             suppressions
                 .GroupBy(s => s.Keyword, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => (IReadOnlyList<KeywordSuppression>)g.ToList(), StringComparer.OrdinalIgnoreCase),
-            matchable.Count == 0 ? null : KeywordMatcher.Build(matchable));
+            KeywordMatcher.For(lookup.Keys, conflicts));
     }
 
     public static KeywordTarget Page(string keyword, string url = "/target/", Guid? key = null) =>

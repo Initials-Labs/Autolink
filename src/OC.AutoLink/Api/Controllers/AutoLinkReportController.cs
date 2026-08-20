@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using OC.AutoLink.Api.Models;
 using OC.AutoLink.Caching;
 using OC.AutoLink.Persistence;
-using OC.AutoLink.Registry;
 using OC.AutoLink.Scanning;
 
 namespace OC.AutoLink.Api.Controllers;
@@ -15,16 +14,11 @@ public sealed class AutoLinkReportController : AutoLinkControllerBase
 {
     private readonly IAutoLinkScanner _scanner;
     private readonly IKeywordSuppressionStore _suppressions;
-    private readonly IKeywordRegistryInvalidator _invalidator;
 
-    public AutoLinkReportController(
-        IAutoLinkScanner scanner,
-        IKeywordSuppressionStore suppressions,
-        IKeywordRegistryInvalidator invalidator)
+    public AutoLinkReportController(IAutoLinkScanner scanner, IKeywordSuppressionStore suppressions)
     {
         _scanner = scanner;
         _suppressions = suppressions;
-        _invalidator = invalidator;
     }
 
     /// <summary>
@@ -52,7 +46,6 @@ public sealed class AutoLinkReportController : AutoLinkControllerBase
         }
 
         _suppressions.Suppress(model.Keyword, model.PageKey, User.Identity?.Name, model.Culture ?? string.Empty);
-        _invalidator.InvalidateEverywhere();
 
         return Ok();
     }
@@ -75,11 +68,6 @@ public sealed class AutoLinkReportController : AutoLinkControllerBase
         }
 
         bool removed = _suppressions.Allow(keyword, pageKey, culture ?? string.Empty);
-
-        if (removed)
-        {
-            _invalidator.InvalidateEverywhere();
-        }
 
         return Ok(new { removed });
     }

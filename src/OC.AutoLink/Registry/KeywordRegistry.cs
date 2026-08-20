@@ -213,23 +213,13 @@ public sealed class KeywordRegistry : IKeywordRegistry
             pair => (IReadOnlyList<KeywordCandidate>)pair.Value,
             StringComparer.OrdinalIgnoreCase);
 
-        // Contested keywords go into the matcher even though they resolve to nothing, so they still claim their
-        // span. Regex.Matches is non-overlapping and the alternation is longest first, so a shorter keyword cannot
-        // match inside a contested phrase. Without this, dropping "content editor" for being contested lets
-        // "editor" link the same words to a third page that was never a candidate.
-        var matchable = new HashSet<string>(targets.Keys, StringComparer.OrdinalIgnoreCase);
-        foreach (KeywordConflict conflict in conflicts)
-        {
-            matchable.Add(conflict.Keyword);
-        }
-
         return new CultureKeywordSet(
             culture,
             targets,
             frozenCandidates,
             conflicts,
             suppressions,
-            matchable.Count == 0 ? null : KeywordMatcher.Build(matchable));
+            KeywordMatcher.For(targets.Keys, conflicts));
     }
 
     /// <summary>

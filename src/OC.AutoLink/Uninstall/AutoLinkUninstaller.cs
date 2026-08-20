@@ -10,9 +10,14 @@ using Umbraco.Cms.Infrastructure.Scoping;
 namespace OC.AutoLink.Uninstall;
 
 /// <summary>
-/// What a teardown removed.
+/// The outcome of a teardown: the migration state key that was reset, so a caller can see which plan was rewound.
 /// </summary>
-public sealed record AutoLinkUninstallResult(bool MappingsRemoved, bool SuppressionsRemoved, string MigrationStateKey);
+/// <remarks>
+/// Deliberately reports no per-table flag. The drops are unconditional and idempotent, and a DDL statement's
+/// affected-row count says nothing about whether the table was there, so any such flag would read as an answer
+/// while being incapable of varying with the truth.
+/// </remarks>
+public sealed record AutoLinkUninstallResult(string MigrationStateKey);
 
 /// <summary>
 /// Removes everything this package created in the database.
@@ -59,15 +64,13 @@ public sealed class AutoLinkUninstaller : IAutoLinkUninstaller
     {
         var plan = new AutoLinkMigrationPlan();
         var upgrader = new Upgrader(plan);
-        bool mappings;
-        bool suppressions;
 
         using (IScope scope = _scopeProvider.CreateScope(autoComplete: true))
         {
             // DROP TABLE IF EXISTS rather than a syntax provider probe: supported by SQLite and by every SQL Server
             // version Umbraco 17 runs on, and it keeps the teardown idempotent.
-            mappings = scope.Database.Execute($"DROP TABLE IF EXISTS {KeywordMappingDto.TableName}") >= 0;
-            suppressions = scope.Database.Execute($"DROP TABLE IF EXISTS {KeywordSuppressionDto.TableName}") >= 0;
+            scope.Database.Execute($"DROP TABLE IF EXISTS {KeywordMappingDto.TableName}");
+            scope.Database.Execute($"DROP TABLE IF EXISTS {KeywordSuppressionDto.TableName}");
         }
 
         _keyValueService.SetValue(upgrader.StateValueKey, plan.InitialState);
@@ -79,6 +82,6 @@ public sealed class AutoLinkUninstaller : IAutoLinkUninstaller
             "Auto-link data removed: both decision tables dropped and the migration state at {Key} reset. Document types were left untouched.",
             upgrader.StateValueKey);
 
-        return new AutoLinkUninstallResult(mappings, suppressions, upgrader.StateValueKey);
+        return new AutoLinkUninstallResult(upgrader.StateValueKey);
     }
 }

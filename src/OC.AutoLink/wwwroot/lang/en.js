@@ -51,17 +51,11 @@ export default {
 		chooseHeading: 'Choose the page this keyword should link to',
 		useThis: 'Use this',
 		untagInstead: 'Untagging one of them works too. This screen never edits anybody’s content.',
-		externalFor: (culture) =>
-			culture
-				? `External link for ${culture}. Nothing is tagged with this keyword, so removing the link removes the keyword.`
-				: 'External link for all languages. Nothing is tagged with this keyword, so removing the link removes the keyword.',
+		externalFor: (language) =>
+			`External link for ${language}. Nothing is tagged with this keyword, so removing the link removes the keyword.`,
 		removeLink: 'Remove link',
-		chosenFor: (culture) =>
-			culture ? `Chosen by hand for ${culture}.` : 'Chosen by hand for all languages.',
-		chosenNoTag: (culture) =>
-			culture
-				? `Chosen by hand for ${culture}, and no page carries this tag.`
-				: 'Chosen by hand for all languages, and no page carries this tag.',
+		chosenFor: (language) => `Chosen by hand for ${language}.`,
+		chosenNoTag: (language) => `Chosen by hand for ${language}, and no page carries this tag.`,
 		undoChoice: 'Undo choice',
 
 		// Detail: mentions

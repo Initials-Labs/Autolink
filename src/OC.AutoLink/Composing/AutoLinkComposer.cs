@@ -44,12 +44,23 @@ public sealed class AutoLinkComposer : IComposer
         // Umbraco registers a policy per built-in section; ours needs registering the same way, with the same
         // requirement type its own section policies use, so access follows the user group section grant.
         builder.Services.AddSingleton<IAuthorizationHandler, SectionAccessHandler>();
+        builder.Services.AddSingleton<IAuthorizationHandler, AdministratorHandler>();
         builder.Services.AddAuthorization(options =>
+        {
             options.AddPolicy(AutoLinkApiConfiguration.PolicyName, policy =>
             {
                 policy.AuthenticationSchemes.Add(Constants.Security.BackOfficeAuthenticationType);
                 policy.Requirements.Add(new SectionAccessRequirement(AutoLinkApiConfiguration.SectionAlias));
-            }));
+            });
+
+            // Teardown is its own policy rather than a check inside the action, so the next destructive endpoint
+            // has something to inherit instead of inventing its own guard.
+            options.AddPolicy(AutoLinkApiConfiguration.TeardownPolicyName, policy =>
+            {
+                policy.AuthenticationSchemes.Add(Constants.Security.BackOfficeAuthenticationType);
+                policy.Requirements.Add(new AdministratorRequirement());
+            });
+        });
 
         // Gives the package endpoints their own document at /umbraco/swagger.
         builder.Services.ConfigureOptions<ConfigureAutoLinkSwaggerGenOptions>();
