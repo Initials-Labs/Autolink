@@ -184,7 +184,7 @@ public sealed class KeywordRegistry : IKeywordRegistry
                 culture);
         }
 
-        // Sorted once, after both passes: stable order so the FirstByUrl fallback and the backoffice list do not
+        // Sorted once, after both passes: stable order so the backoffice conflict list does not
         // shuffle between rebuilds.
         foreach (List<KeywordCandidate> claimants in candidates.Values)
         {
@@ -205,15 +205,6 @@ public sealed class KeywordRegistry : IKeywordRegistry
             if (resolved is not null)
             {
                 targets[keyword] = resolved;
-            }
-        }
-
-        foreach ((string keyword, string url) in options.DebugKeywords)
-        {
-            string trimmed = keyword.Trim();
-            if (trimmed.Length > 0)
-            {
-                targets[trimmed] = new KeywordTarget(trimmed, Guid.Empty, url, trimmed, KeywordSource.Debug);
             }
         }
 
@@ -381,11 +372,11 @@ public sealed class KeywordRegistry : IKeywordRegistry
             return null;
         }
 
+        // Contested, and nothing settles it: report it and link nothing. A confidently wrong link is worse than no
+        // link, and an unlinked keyword is what sends somebody to the dashboard to make the call.
         conflicts.Add(new KeywordConflict(keyword, claimants));
 
-        return options.OnUnresolvedCollision == UnresolvedCollisionBehaviour.FirstByUrl
-            ? new KeywordTarget(keyword, claimants[0].TargetKey, claimants[0].Url, claimants[0].TargetName, KeywordSource.Tag)
-            : null;
+        return null;
     }
 
     /// <summary>

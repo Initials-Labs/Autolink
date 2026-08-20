@@ -62,7 +62,7 @@ the loser dropped silently.
 Which page a contested phrase should point at is an editorial decision. A priority number on the doctype, or
 "nearest ancestor wins", would silence the symptom without ever recording that a decision was made. So:
 resolution precedence is **manual mapping, then uncontested tag, then nothing**, and an unresolved collision is
-reported rather than guessed (`OnUnresolvedCollision: FirstByUrl` restores a deterministic guess if wanted).
+reported rather than guessed.
 
 Mappings live in `ocAutoLinkKeywordMapping` (real `MigrationPlan`), store the **target key rather than a URL**,
 and may point at a page carrying no tag at all — which is also how synonyms and plurals get expressed without

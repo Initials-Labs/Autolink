@@ -86,9 +86,15 @@ character, so wrapping the group would stop `C#` ever matching.
 
 ### 3. Invalidation
 
-Global, via `ContentPublished` / `ContentUnpublished` / `ContentDeleted` / `ContentMoved` /
-`ContentMovedToRecycleBin`. Any page's output depends on the whole keyword set, and you cannot know which
-pages mention which keywords without rendering them.
+Global, via `ContentCacheRefresherNotification` — one hook where five content notifications used to be. Any
+page's output depends on the whole keyword set, and you cannot know which pages mention which keywords without
+rendering them.
+
+The choice of hook matters twice over. `ContentPublished` fires *inside* the publish, before the published cache
+has settled, so a render at that moment can rebuild from stale content and then mark itself clean, staying stale
+until the next content change. It also only fires on the server that did the publishing — other nodes learn about
+content changes through the distributed cache, which runs their refreshers, which raises this notification
+there too.
 
 The stamp is a **content hash of the built dictionary**, not a publish counter. A rebuild that produces an
 identical keyword and URL set keeps the existing snapshot, so a typo fix on a target page does not move the
@@ -132,11 +138,9 @@ first, and the loser was dropped silently. Nothing anywhere recorded that a seco
 
 Unresolved keywords are **left out of the matcher entirely**, so the phrase renders as plain text and lands in
 `KeywordSnapshot.Conflicts`. That is a deliberate change from first-past-the-post: a confidently wrong link is
-worse than no link, and an unlinked keyword is what sends somebody to the mapping screen to make the call. Set
-`OnUnresolvedCollision: "FirstByUrl"` to link the first candidate by URL instead — deterministic across
-restarts, unlike the original tag-query order, but still a guess.
+worse than no link, and an unlinked keyword is what sends somebody to the mapping screen to make the call.
 
-Candidate lists are sorted by URL, so the fallback and the backoffice list do not shuffle between rebuilds.
+Candidate lists are sorted by URL, so the backoffice list does not shuffle between rebuilds.
 
 **A contested keyword stays in the matcher even though it resolves to nothing**, so it still claims its span.
 `Regex.Matches` is non-overlapping and the alternation is longest first, so this stops a shorter keyword matching
@@ -546,27 +550,26 @@ is fast enough that a stamp-keyed `IAppPolicyCache` is not worth the complexity 
       "KeywordsPropertyAlias": "linkKeywords",
       "ExcludePropertyAlias": "excludeFromAutoLinking",
       "ExternalLinkRel": "nofollow",
-      "OnUnresolvedCollision": "Skip",
       "MaxLinksPerKeyword": 1,
       "MaxLinksPerPage": 25,
       "InstallSchema": true,
-      "InstallOnDocumentTypes": [ "article", "content", "home", "category", "author" ],
-      "DebugKeywords": {}
+      "InstallOnDocumentTypes": [ "article", "content", "home", "category", "author" ]
     }
   }
 }
 ```
 
-`TagGroup` **must match the group declared by the datatype bound to `linkKeywords`**, or nothing links. The dev
-config uses `default` because the properties on this site are bound to Umbraco's stock Tags datatype. That works,
-but `default` is the catch-all group: any other stock Tags property on the site would feed keywords into the
-linker. A shipping package wants its own datatype and its own group, which is what `InstallSchema` creates —
-just check the doctype property actually points at it. `tagconfig?nodeId=` tells you.
+`TagGroup` **must match the group declared by the datatype bound to `linkKeywords`**, or nothing links.
+Umbraco's stock Tags datatype declares the catch-all `default` group, so pointing at that feeds every other
+stock Tags property on the site into the linker. Give the linker its own datatype and its own group — which is
+what `InstallSchema` creates — then check the doctype property actually points at it.
 
-`OnUnresolvedCollision` is `Skip` or `FirstByUrl`; see collisions above.
-
-`DebugKeywords` is the Spike 0 escape hatch: hardcoded keyword to URL pairs merged over the tags query, so the
-render pipeline can be proved with no content setup at all.
+> **This is the setup trap, and it fails silently.** Tag relations are written into the group the *datatype*
+> declares, and the registry only ever queries `TagGroup`. Bind `linkKeywords` to the stock Tags datatype (group
+> `default`) while `TagGroup` says `autolink`, and every save works perfectly, writes real relations, and the
+> registry sees nothing. The property shows the keywords in the content editor the whole time, so nothing looks
+> broken. The dashboard's empty state says as much — check which datatype the property is bound to before
+> assuming the linker is broken.
 
 Bound through `IOptionsMonitor`, so edits apply **without a restart**.
 
@@ -583,46 +586,6 @@ migration plan. Set `InstallSchema: false` to turn it off.
 > regenerates the models under already-compiled views, and the first page load after install fails with
 > `ModelBindingException: ... application is in an unstable state and should be restarted`. Restart once and
 > it is gone — the installer is idempotent so it makes no changes on subsequent boots.
-
----
-
-## Demo harness
-
-`Autolink/Demo/AutoLinkDemoController.cs` (Development only, and in the site project rather than the package).
-Drives the spikes without clicking through the backoffice, using the real content services so the genuine
-`ContentPublishedNotification` fires.
-
-```
-GET /autolink-demo/status                        current keyword set and stamp
-GET /autolink-demo/tag?nodeId=1121&keywords=a,b  set keywords and publish
-GET /autolink-demo/untag?nodeId=1121             clear keywords and publish
-GET /autolink-demo/unpublish?nodeId=1121         unpublish a target
-GET /autolink-demo/republish?nodeId=1121         republish unchanged
-GET /autolink-demo/nodes                         nodes that can carry keywords, with ids
-GET /autolink-demo/tags?group=default            raw tag store and tags-query view (empty group = all)
-GET /autolink-demo/tagconfig?nodeId=1121         datatype and tag group bound to the keyword property
-GET /autolink-demo/invalidate                    mark the registry stale without reading it back
-GET /autolink-demo/mappings                      stored manual mappings
-GET /autolink-demo/map?keyword=a&nodeId=1121     pin a keyword, as the backoffice screen does
-GET /autolink-demo/unmap?keyword=a               back to automatic resolution
-GET /autolink-demo/scan                          dry-run audit of every published page
-GET /autolink-demo/suppress?keyword=a&nodeId=0   switch a keyword off (nodeId 0 = everywhere)
-GET /autolink-demo/allow?keyword=a&nodeId=0      switch it back on
-GET /autolink-demo/suppressions                  stored suppressions
-GET /autolink-demo/cultures                      languages, and per culture what the tag store and query hold
-GET /autolink-demo/map?keyword=a&nodeId=1&culture=en-US    decisions take an optional culture, blank for all
-```
-
-> **The tag group is the setup trap, and it fails silently.** Tag relations are written into the group the
-> *datatype* declares, and the registry only queries `TagGroup`. Bind `linkKeywords` to Umbraco's stock **Tags**
-> datatype (group `default`) while `TagGroup` says `autolink`, and every save works perfectly, writes real
-> relations, and the registry sees nothing. The property shows the keywords in the content editor the whole time,
-> so nothing looks broken. `tagconfig?nodeId=` prints the datatype and group actually bound to the property, and
-> `tags?group=` (empty for every group) shows where the relations really landed. Those two answer this in one
-> request each — worth reaching for before assuming the linker is broken.
-
-> `invalidate` exists because reading `_registry.Current` inside the same request that published something
-> rebuilds against a cache that has not settled, which looks exactly like the registry losing keywords.
 
 ---
 

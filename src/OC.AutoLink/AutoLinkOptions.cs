@@ -34,11 +34,6 @@ public sealed class AutoLinkOptions
     public string ExternalLinkRel { get; set; } = "nofollow";
 
     /// <summary>
-    /// What happens to a keyword two or more pages claim with no manual mapping to settle it.
-    /// </summary>
-    public UnresolvedCollisionBehaviour OnUnresolvedCollision { get; set; } = UnresolvedCollisionBehaviour.Skip;
-
-    /// <summary>
     /// How many times a single keyword may be linked on one page. SEO caution — the first mention is the useful one.
     /// </summary>
     public int MaxLinksPerKeyword { get; set; } = 1;
@@ -77,10 +72,4 @@ public sealed class AutoLinkOptions
     /// than at every startup, is the outstanding improvement here.
     /// </remarks>
     public bool InstallSchema { get; set; }
-
-    /// <summary>
-    /// Hardcoded keyword to URL pairs, merged over whatever the tags query finds. This is the Spike 0 escape
-    /// hatch — it proves the render pipeline without any content setup at all.
-    /// </summary>
-    public Dictionary<string, string> DebugKeywords { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
