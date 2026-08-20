@@ -688,17 +688,48 @@ Fixed, with the reasoning worth keeping:
 - **Warnings are errors** in the package, and CI fails the build if the dashboard or the backoffice manifest stops
   being packed.
 
+### Removing the package
+
+Umbraco has no uninstall hook for a package delivered over NuGet: removing the reference removes the assembly and
+leaves the tables. So teardown is an explicit call.
+
+```
+DELETE /umbraco/management/api/v1/autolink/data?confirm=remove-autolink-data
+```
+
+It drops both decision tables and **resets the migration state**, which is the part that matters. Dropping the tables
+while `umbracoKeyValue` still records the plan as complete means a reinstall never recreates them, and the package
+comes back up permanently broken with stores that log and return empty.
+
+Document types are left alone on purpose. The keyword property holds editors' data, and deleting it would take every
+keyword on every page with it. Delete the property yourself if you want it gone.
+
+Deliberately not a button in the dashboard: a destructive action one click from the screen editors use every day is a
+mistake waiting to happen. The confirmation token exists for the same reason.
+
+### Accessibility
+
+The keyword list has **list semantics, not table roles**. It looks like a table, but each row contains its own detail
+panel, and no table role permits that — `role="row"` with a non-cell child is invalid and screen readers handle it
+unpredictably. A list of keywords with expandable regions is what it actually is.
+
+Each toggle has a real name (`Show detail for Harrie`, not an unlabelled glyph), `aria-controls` pointing at its
+panel, and the panel is a labelled region. The chevron and the external arrow are `aria-hidden`, so the pill reads
+"external" rather than "external north east arrow". The language switcher is a labelled group with `aria-pressed`,
+the header row is hidden from assistive tech because column labels mean nothing in a list, and the one custom control
+has a visible focus ring.
+
+None of it has been through an actual screen reader. Sound structure, unverified behaviour.
+
 ### Still outstanding
 
 | Item | Why it is not done |
 |---|---|
 | Localisation | Dashboard strings are hardcoded English. Needed before a public release, not before internal use. |
 | Consumer documentation | This README is a build log. A shipping package needs a shorter one aimed at somebody installing it. |
-| Licence | Deliberately unset in the csproj rather than assumed — the choice is the author's. |
 | Schema install as a migration | Still a startup fixup rather than a run-once migration, now that a plan exists to put it in. |
 | Delivery API | Delegated but not linked. Decide whether to support it or document it as out of scope. |
-| Accessibility | The keyword list is a CSS grid, not table semantics, and the accordion needs keyboard support. |
-| Uninstall | Removing the package leaves its two tables behind. |
+| Accessibility, verified | The structure is sound, but nothing has been through a screen reader. |
 | Segments | `VariationContext` carries a segment as well as a culture; only culture is used. |
 
 ---

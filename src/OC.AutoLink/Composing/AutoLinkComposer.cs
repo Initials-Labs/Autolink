@@ -11,6 +11,7 @@ using OC.AutoLink.Persistence;
 using OC.AutoLink.PropertyEditors;
 using OC.AutoLink.Registry;
 using OC.AutoLink.Scanning;
+using OC.AutoLink.Uninstall;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
@@ -32,6 +33,7 @@ public sealed class AutoLinkComposer : IComposer
         builder.Services.AddSingleton<IKeywordMappingStore, KeywordMappingStore>();
         builder.Services.AddSingleton<IKeywordSuppressionStore, KeywordSuppressionStore>();
         builder.Services.AddSingleton<IAutoLinkScanner, AutoLinkScanner>();
+        builder.Services.AddSingleton<IAutoLinkUninstaller, AutoLinkUninstaller>();
         builder.Services.AddSingleton<IKeywordRegistry, KeywordRegistry>();
         builder.Services.AddSingleton<IAutoLinker, AutoLinker>();
 

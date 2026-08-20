@@ -205,6 +205,11 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 		);
 	}
 
+	/** A DOM-safe id for a keyword, so aria-controls can reference its detail panel. */
+	#panelId(keyword) {
+		return `autolink-detail-${keyword.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+	}
+
 	#state(placement) {
 		if (placement.suppressed) return 'off';
 		return placement.skipReason ? 'skipped' : 'linked';
@@ -352,13 +357,14 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 
 				${when(
 					cultures.length > 1,
-					() => html`<div class="languages">
+					() => html`<div class="languages" role="group" aria-label="Language">
 						${repeat(
 							cultures,
 							(entry) => entry.culture,
 							(entry) => html`<uui-button
 								look=${entry.culture === this._culture ? 'primary' : 'outline'}
 								color=${entry.conflicts > 0 ? 'danger' : 'default'}
+								aria-pressed=${entry.culture === this._culture ? 'true' : 'false'}
 								label="${this.#languageLabel(entry.culture)} (${entry.total})"
 								@click=${() => {
 									this._culture = entry.culture;
@@ -456,8 +462,8 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 
 		return html`
 			<uui-box>
-				<div class="table">
-					<div class="head">
+				<div class="table" role="list" aria-label="Keywords" aria-busy=${this._loading ? 'true' : 'false'}>
+					<div class="head" aria-hidden="true">
 						<span></span>
 						<span>Keyword</span>
 						<span>Links to</span>
@@ -484,13 +490,14 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 		};
 
 		return html`
-			<div class="row ${row.hasConflict ? 'attention' : ''} ${open ? 'open' : ''}">
+			<div class="row ${row.hasConflict ? 'attention' : ''} ${open ? 'open' : ''}" role="listitem">
 				<button
 					class="caret"
 					aria-expanded=${open ? 'true' : 'false'}
-					title=${open ? 'Hide detail' : 'Show detail'}
+					aria-controls=${this.#panelId(row.keyword)}
+					aria-label="${open ? 'Hide' : 'Show'} detail for ${row.keyword}"
 					@click=${() => this.#toggle(row.keyword)}>
-					${open ? '▾' : '▸'}
+					<span aria-hidden="true">${open ? '▾' : '▸'}</span>
 				</button>
 
 				<span class="keyword">${row.keyword}</span>
@@ -501,7 +508,7 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 						: row.source === 'external'
 							? html`<a href=${row.url} target="_blank" rel="noopener noreferrer">${row.targetName}</a>
 									<span class="path">${row.url}</span>
-									<span class="pill">external &#8599;</span>`
+									<span class="pill">external <span aria-hidden="true">&#8599;</span></span>`
 							: row.url
 								? html`<a href=${row.url} target="_blank" rel="noopener">${row.targetName}</a>
 										<span class="path">${row.url}</span>
@@ -524,7 +531,11 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 
 	#renderDetail(row, mentions) {
 		return html`
-			<div class="detail">
+			<div
+				class="detail"
+				id=${this.#panelId(row.keyword)}
+				role="region"
+				aria-label="Detail for ${row.keyword}">
 				${this.#renderChoice(row)}
 				${mentions.length === 0
 					? html`<p class="muted">
@@ -732,6 +743,12 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 			cursor: pointer;
 			padding: 0;
 			color: inherit;
+			border-radius: 3px;
+		}
+
+		.caret:focus-visible {
+			outline: 2px solid var(--uui-color-focus, var(--uui-color-interactive, #3544b1));
+			outline-offset: 2px;
 		}
 
 		.keyword {

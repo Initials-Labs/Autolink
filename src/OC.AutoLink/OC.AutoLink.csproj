@@ -31,8 +31,8 @@
     <RepositoryUrl>https://github.com/OwainWilliams/OC.AutoLink</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageProjectUrl>https://github.com/OwainWilliams/OC.AutoLink</PackageProjectUrl>
-    <!-- TODO before any public release: pick a licence. Deliberately unset rather than assumed, since the
-         choice is the author's. MIT is the norm for Umbraco community packages. -->
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Copyright>Copyright (c) 2026 Owain Williams</Copyright>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <GenerateRepositoryUrlAttribute>true</GenerateRepositoryUrlAttribute>
