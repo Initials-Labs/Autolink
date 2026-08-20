@@ -7,13 +7,13 @@ import '@umbraco-cms/backoffice/external/uui';
 const API = '/umbraco/management/api/v1/autolink';
 const EVERYWHERE = '00000000-0000-0000-0000-000000000000';
 
-/** Why a mention was not linked. The server sends codes; the wording belongs here. */
-const REASONS = {
-	self: 'this is the page it points at',
-	'hand-linked': 'already linked by hand',
-	'skipped-element': 'sits in a heading or an existing link',
-	limit: 'only the first mention on a page is linked',
-	contested: 'more than one page claims this keyword',
+/** Skip codes from the server to localisation keys. The wording lives in lang/en-gb.js. */
+const REASON_KEYS = {
+	self: 'ocAutoLink_reasonSelf',
+	'hand-linked': 'ocAutoLink_reasonHandLinked',
+	'skipped-element': 'ocAutoLink_reasonSkippedElement',
+	limit: 'ocAutoLink_reasonLimit',
+	contested: 'ocAutoLink_reasonContested',
 };
 
 /**
@@ -96,11 +96,11 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 		if (response.status === 401 || response.status === 403) {
 			return {
 				data: null,
-				error: `Not authorised (${response.status}). Your user group needs access to the Auto-linking section.`,
+				error: this.localize.term('ocAutoLink_notAuthorised', response.status),
 			};
 		}
 
-		return { data: null, error: `The request failed (${response.status}).` };
+		return { data: null, error: this.localize.term('ocAutoLink_requestFailed', response.status) };
 	}
 
 	async #load() {
@@ -144,7 +144,7 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 	}
 
 	#languageLabel(culture) {
-		return culture.length === 0 ? 'All languages' : culture;
+		return culture.length === 0 ? this.localize.term('ocAutoLink_allLanguages') : culture;
 	}
 
 	/** Keyword rows for the language being viewed, the ones needing attention first. */
@@ -210,6 +210,13 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 		return `autolink-detail-${keyword.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 	}
 
+	/** The localised clause explaining why a mention was not linked. */
+	#reason(placement) {
+		const key = REASON_KEYS[placement.skipReason];
+
+		return key ? this.localize.term(key) : placement.skipReason;
+	}
+
 	#state(placement) {
 		if (placement.suppressed) return 'off';
 		return placement.skipReason ? 'skipped' : 'linked';
@@ -241,7 +248,7 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 			'PUT',
 			'/mapping',
 			{ keyword, targetKey, culture: this._culture ?? '' },
-			`"${keyword}" now links to ${targetName}.`,
+			this.localize.term('ocAutoLink_nowLinksTo', keyword, targetName),
 		);
 	}
 
@@ -250,7 +257,7 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 		const url = this._newUrl.trim();
 
 		if (!keyword || !url) {
-			this.#notify('danger', 'A keyword and a URL are both needed.');
+			this.#notify('danger', this.localize.term('ocAutoLink_addNeedsBoth'));
 			return;
 		}
 
@@ -265,7 +272,7 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 				nofollow: this._newNofollow,
 				culture: this._culture ?? '',
 			},
-			`"${keyword}" now links to ${url}.`,
+			this.localize.term('ocAutoLink_nowLinksTo', keyword, url),
 		);
 
 		this._adding = false;
@@ -280,7 +287,7 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 			'DELETE',
 			`/mapping?keyword=${encodeURIComponent(keyword)}&culture=${encodeURIComponent(mappingCulture ?? '')}`,
 			null,
-			`"${keyword}" is back on automatic resolution.`,
+			this.localize.term('ocAutoLink_backToAutomatic', keyword),
 		);
 	}
 
@@ -291,8 +298,8 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 			'/suppression',
 			{ keyword, pageKey, culture: this._culture ?? '' },
 			pageKey === EVERYWHERE
-				? `"${keyword}" will not be linked anywhere.`
-				: `"${keyword}" will not be linked on ${name}.`,
+				? this.localize.term('ocAutoLink_willNotLinkAnywhere', keyword)
+				: this.localize.term('ocAutoLink_willNotLinkOn', keyword, name),
 		);
 	}
 
@@ -303,7 +310,7 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 			`/suppression?keyword=${encodeURIComponent(keyword)}&pageKey=${placement.suppressedPageKey}` +
 				`&culture=${encodeURIComponent(placement.suppressedCulture ?? '')}`,
 			null,
-			`"${keyword}" can link again.`,
+			this.localize.term('ocAutoLink_canLinkAgain', keyword),
 		);
 	}
 
@@ -321,9 +328,12 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 		}
 
 		if (this._error) {
-			return html`<uui-box headline="Keywords">
+			return html`<uui-box headline=${this.localize.term('ocAutoLink_heading')}>
 				<p>${this._error}</p>
-				<uui-button look="secondary" label="Try again" @click=${() => this.#load()}></uui-button>
+				<uui-button
+					look="secondary"
+					label=${this.localize.term('ocAutoLink_tryAgain')}
+					@click=${() => this.#load()}></uui-button>
 			</uui-box>`;
 		}
 
@@ -344,20 +354,23 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 		}
 
 		return html`
-			<uui-box headline="Keywords">
+			<uui-box headline=${this.localize.term('ocAutoLink_heading')}>
 				<div slot="header-actions">
 					<uui-button
 						look="secondary"
-						label=${this._adding ? 'Cancel' : 'Add external link'}
+						label=${this._adding ? this.localize.term('ocAutoLink_cancel') : this.localize.term('ocAutoLink_addExternal')}
 						@click=${() => {
 							this._adding = !this._adding;
 						}}></uui-button>
-					<uui-button look="secondary" label="Refresh" @click=${() => this.#load()}></uui-button>
+					<uui-button
+						look="secondary"
+						label=${this.localize.term('ocAutoLink_refresh')}
+						@click=${() => this.#load()}></uui-button>
 				</div>
 
 				${when(
 					cultures.length > 1,
-					() => html`<div class="languages" role="group" aria-label="Language">
+					() => html`<div class="languages" role="group" aria-label=${this.localize.term('ocAutoLink_languageGroup')}>
 						${repeat(
 							cultures,
 							(entry) => entry.culture,
@@ -376,13 +389,20 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 				${when(this._adding, () => this.#renderAddForm())}
 
 				<p class="totals">
-					<strong>${rows.length}</strong> keyword${rows.length === 1 ? '' : 's'}
+					${rows.length === 1
+						? this.localize.term('ocAutoLink_keywordCountOne', rows.length)
+						: this.localize.term('ocAutoLink_keywordCountMany', rows.length)}
 					${when(
 						selected?.conflicts,
-						() => html`&middot; <strong class="bad">${selected.conflicts}</strong> needing a decision`,
+						() => html`&middot;
+							<span class="bad">${selected.conflicts} ${this.localize.term('ocAutoLink_needingDecision')}</span>`,
 					)}
-					&middot; linking on <strong>${linkedPages.size}</strong> page${linkedPages.size === 1 ? '' : 's'}
-					&middot; <span class="muted">${this._report?.pagesScanned ?? 0} pages checked, nothing stored</span>
+					&middot;
+					${linkedPages.size === 1
+						? this.localize.term('ocAutoLink_linkingOnPagesOne', linkedPages.size)
+						: this.localize.term('ocAutoLink_linkingOnPagesMany', linkedPages.size)}
+					&middot;
+					<span class="muted">${this.localize.term('ocAutoLink_pagesChecked', this._report?.pagesScanned ?? 0)}</span>
 				</p>
 			</uui-box>
 		`;
@@ -394,30 +414,29 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 		return html`
 			<div class="add">
 				<div class="add-head">
-					Link a keyword to somewhere outside the site, in
-					<strong>${this.#languageLabel(this._culture ?? '')}</strong>
+					${this.localize.term('ocAutoLink_addHeading', this.#languageLabel(this._culture ?? ''))}
 				</div>
 
 				<div class="add-fields">
 					<uui-input
-						label="Keyword"
-						placeholder="Keyword, as it is written in the copy"
+						label=${this.localize.term('ocAutoLink_fieldKeyword')}
+						placeholder=${this.localize.term('ocAutoLink_fieldKeywordHint')}
 						.value=${this._newKeyword}
 						@input=${(event) => {
 							this._newKeyword = event.target.value ?? '';
 						}}></uui-input>
 
 					<uui-input
-						label="URL"
-						placeholder="https://example.com"
+						label=${this.localize.term('ocAutoLink_fieldUrl')}
+						placeholder=${this.localize.term('ocAutoLink_fieldUrlHint')}
 						.value=${this._newUrl}
 						@input=${(event) => {
 							this._newUrl = event.target.value ?? '';
 						}}></uui-input>
 
 					<uui-input
-						label="Title"
-						placeholder="Optional title, defaults to the host"
+						label=${this.localize.term('ocAutoLink_fieldTitle')}
+						placeholder=${this.localize.term('ocAutoLink_fieldTitleHint')}
 						.value=${this._newLabel}
 						@input=${(event) => {
 							this._newLabel = event.target.value ?? '';
@@ -431,14 +450,14 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 						@change=${(event) => {
 							this._newNofollow = event.target.checked;
 						}} />
-					Add <code>rel="nofollow"</code>, so a wall of outbound links does not read as a link scheme
+					${this.localize.term('ocAutoLink_nofollowLabel')}
 				</label>
 
 				<div>
 					<uui-button
 						look="primary"
 						color="positive"
-						label="Add link"
+						label=${this.localize.term('ocAutoLink_addLink')}
 						?disabled=${busy}
 						@click=${() => this.#addExternal()}></uui-button>
 				</div>
@@ -451,10 +470,7 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 
 		if (rows.length === 0) {
 			return html`<uui-box>
-				<p>
-					No keywords in <strong>${this.#languageLabel(this._culture ?? '')}</strong>. Tag a page in this language,
-					or check the configured tag group matches the datatype bound to the keyword property.
-				</p>
+				<p>${this.localize.term('ocAutoLink_noKeywords', this.#languageLabel(this._culture ?? ''))}</p>
 			</uui-box>`;
 		}
 
@@ -462,12 +478,16 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 
 		return html`
 			<uui-box>
-				<div class="table" role="list" aria-label="Keywords" aria-busy=${this._loading ? 'true' : 'false'}>
+				<div
+					class="table"
+					role="list"
+					aria-label=${this.localize.term('ocAutoLink_heading')}
+					aria-busy=${this._loading ? 'true' : 'false'}>
 					<div class="head" aria-hidden="true">
 						<span></span>
-						<span>Keyword</span>
-						<span>Links to</span>
-						<span>Mentions</span>
+						<span>${this.localize.term('ocAutoLink_columnKeyword')}</span>
+						<span>${this.localize.term('ocAutoLink_columnLinksTo')}</span>
+						<span>${this.localize.term('ocAutoLink_columnMentions')}</span>
 					</div>
 					${repeat(
 						rows,
@@ -495,7 +515,9 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 					class="caret"
 					aria-expanded=${open ? 'true' : 'false'}
 					aria-controls=${this.#panelId(row.keyword)}
-					aria-label="${open ? 'Hide' : 'Show'} detail for ${row.keyword}"
+					aria-label=${open
+						? this.localize.term('ocAutoLink_hideDetail', row.keyword)
+						: this.localize.term('ocAutoLink_showDetail', row.keyword)}
 					@click=${() => this.#toggle(row.keyword)}>
 					<span aria-hidden="true">${open ? '▾' : '▸'}</span>
 				</button>
@@ -504,24 +526,36 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 
 				<span class="destination">
 					${row.hasConflict
-						? html`<span class="bad">two pages claim this &mdash; choose one below</span>`
+						? html`<span class="bad">${this.localize.term('ocAutoLink_contestedSummary')}</span>`
 						: row.source === 'external'
 							? html`<a href=${row.url} target="_blank" rel="noopener noreferrer">${row.targetName}</a>
 									<span class="path">${row.url}</span>
-									<span class="pill">external <span aria-hidden="true">&#8599;</span></span>`
+									<span class="pill">${this.localize.term('ocAutoLink_external')} <span aria-hidden="true">&#8599;</span></span>`
 							: row.url
 								? html`<a href=${row.url} target="_blank" rel="noopener">${row.targetName}</a>
 										<span class="path">${row.url}</span>
-										${when(row.source === 'manual', () => html`<span class="muted">chosen by hand</span>`)}`
-								: html`<span class="muted">nothing yet</span>`}
+										${when(
+											row.source === 'manual',
+											() => html`<span class="muted">${this.localize.term('ocAutoLink_chosenByHand')}</span>`,
+										)}`
+								: html`<span class="muted">${this.localize.term('ocAutoLink_nothingYet')}</span>`}
 				</span>
 
 				<span class="counts">
 					${mentions.length === 0
-						? html`<span class="muted">none</span>`
-						: html`${when(counts.linked, () => html`<span class="good">${counts.linked} linked</span>`)}
-								${when(counts.off, () => html`<span class="warn">${counts.off} off</span>`)}
-								${when(counts.skipped, () => html`<span class="muted">${counts.skipped} not linked</span>`)}`}
+						? html`<span class="muted">${this.localize.term('ocAutoLink_countNone')}</span>`
+						: html`${when(
+									counts.linked,
+									() => html`<span class="good">${this.localize.term('ocAutoLink_countLinked', counts.linked)}</span>`,
+								)}
+								${when(
+									counts.off,
+									() => html`<span class="warn">${this.localize.term('ocAutoLink_countOff', counts.off)}</span>`,
+								)}
+								${when(
+									counts.skipped,
+									() => html`<span class="muted">${this.localize.term('ocAutoLink_countNotLinked', counts.skipped)}</span>`,
+								)}`}
 				</span>
 
 				${when(open, () => this.#renderDetail(row, mentions))}
@@ -535,15 +569,14 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 				class="detail"
 				id=${this.#panelId(row.keyword)}
 				role="region"
-				aria-label="Detail for ${row.keyword}">
+				aria-label=${this.localize.term('ocAutoLink_detailFor', row.keyword)}>
 				${this.#renderChoice(row)}
 				${mentions.length === 0
-					? html`<p class="muted">
-							No published page in this language writes this word, so the link appears nowhere yet.
-						</p>`
+					? html`<p class="muted">${this.localize.term('ocAutoLink_noMentions')}</p>`
 					: html`<div class="caption">
-								Mentioned on ${this.#byPage(mentions).length}
-								page${this.#byPage(mentions).length === 1 ? '' : 's'}
+								${this.#byPage(mentions).length === 1
+									? this.localize.term('ocAutoLink_mentionedOnOne', this.#byPage(mentions).length)
+									: this.localize.term('ocAutoLink_mentionedOnMany', this.#byPage(mentions).length)}
 							</div>
 							<div class="mentions">
 								${repeat(
@@ -557,7 +590,7 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 								() => html`<uui-button
 									look="secondary"
 									color="danger"
-									label="Never link this keyword"
+									label=${this.localize.term('ocAutoLink_neverLink')}
 									?disabled=${this._busy === `off|${row.keyword}|${EVERYWHERE}`}
 									@click=${() => this.#unlink(row.keyword, EVERYWHERE, 'any page')}></uui-button>`,
 							)}`}
@@ -572,33 +605,34 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 		if (row.hasConflict) {
 			return html`
 				<div class="choice">
-					<div class="choice-head">Choose the page this keyword should link to</div>
+					<div class="choice-head">${this.localize.term('ocAutoLink_chooseHeading')}</div>
 					${repeat(
 						row.candidates,
 						(candidate) => candidate.targetKey,
 						(candidate) => html`<div class="option">
 							<uui-button
 								look="secondary"
-								label="Use this"
+								label=${this.localize.term('ocAutoLink_useThis')}
 								?disabled=${busy}
 								@click=${() => this.#use(row.keyword, candidate.targetKey, candidate.targetName)}></uui-button>
 							<a href=${candidate.url} target="_blank" rel="noopener">${candidate.targetName}</a>
 							<span class="path">${candidate.url}</span>
 						</div>`,
 					)}
-					<p class="muted">Untagging one of them works too. This screen never edits anybody's content.</p>
+					<p class="muted">${this.localize.term('ocAutoLink_untagInstead')}</p>
 				</div>
 			`;
 		}
 
 		if (row.source === 'external') {
 			return html`<p class="chosen">
-				External link${row.mappingCulture ? ` for ${row.mappingCulture}` : ' for all languages'}. Nothing is tagged
-				with this keyword, so removing the link removes the keyword.
+				${row.mappingCulture
+					? this.localize.term('ocAutoLink_externalForCulture', row.mappingCulture)
+					: this.localize.term('ocAutoLink_externalForAll')}
 				<uui-button
 					look="secondary"
 					color="danger"
-					label="Remove link"
+					label=${this.localize.term('ocAutoLink_removeLink')}
 					?disabled=${busy}
 					@click=${() => this.#clearChoice(row.keyword, row.mappingCulture)}></uui-button>
 			</p>`;
@@ -608,12 +642,14 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 			const tagged = row.candidates.length > 0;
 
 			return html`<p class="chosen">
-				Chosen by hand${row.mappingCulture ? ` for ${row.mappingCulture}` : ' for all languages'}${tagged
-					? ''
-					: ', and no page carries this tag'}.
+				${!tagged && row.mappingCulture
+					? this.localize.term('ocAutoLink_chosenNoTag', row.mappingCulture)
+					: row.mappingCulture
+						? this.localize.term('ocAutoLink_chosenForCulture', row.mappingCulture)
+						: this.localize.term('ocAutoLink_chosenForAll')}
 				<uui-button
 					look="secondary"
-					label="Undo choice"
+					label=${this.localize.term('ocAutoLink_undoChoice')}
 					?disabled=${busy}
 					@click=${() => this.#clearChoice(row.keyword, row.mappingCulture)}></uui-button>
 			</p>`;
@@ -633,7 +669,7 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 					extras,
 					(placement, index) => `${placement.skipReason}-${index}`,
 					(placement) => html`<div class="note">
-						also mentioned here, ${REASONS[placement.skipReason] ?? placement.skipReason}
+						${this.localize.term('ocAutoLink_anotherMention', this.#reason(placement))}
 					</div>`,
 				)}
 			</div>
@@ -655,24 +691,28 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 				<span class="path">${page.url}</span>
 
 				${state === 'linked'
-					? html`<span class="good">linked</span>
+					? html`<span class="good">${this.localize.term('ocAutoLink_linked')}</span>
 							<uui-button
 								look="secondary"
-								label="Do not link here"
+								label=${this.localize.term('ocAutoLink_doNotLinkHere')}
 								?disabled=${busy}
 								@click=${() => this.#unlink(row.keyword, page.pageKey, page.name)}></uui-button>`
 					: state === 'off'
 						? html`<span class="warn">
-									switched off ${offEverywhere ? 'everywhere' : 'here'}${offAllLanguages
-										? ', all languages'
+									${offEverywhere
+										? this.localize.term('ocAutoLink_switchedOffEverywhere')
+										: this.localize.term('ocAutoLink_switchedOffHere')}${offAllLanguages
+										? this.localize.term('ocAutoLink_allLanguagesSuffix')
 										: ''}
 								</span>
 								<uui-button
 									look="secondary"
-									label=${offEverywhere ? 'Allow everywhere' : 'Allow here'}
+									label=${offEverywhere
+										? this.localize.term('ocAutoLink_allowEverywhere')
+										: this.localize.term('ocAutoLink_allowHere')}
 									?disabled=${busy}
 									@click=${() => this.#allow(row.keyword, placement)}></uui-button>`
-						: html`<span class="muted">not linked, ${REASONS[placement.skipReason] ?? placement.skipReason}</span>`}
+						: html`<span class="muted">${this.localize.term('ocAutoLink_notLinked', this.#reason(placement))}</span>`}
 			</div>
 		`;
 	}

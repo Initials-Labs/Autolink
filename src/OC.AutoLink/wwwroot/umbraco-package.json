@@ -5,12 +5,21 @@
   "allowTelemetry": false,
   "extensions": [
     {
+      "type": "localization",
+      "alias": "OC.AutoLink.Localization.EnGb",
+      "name": "Auto-link English (United Kingdom)",
+      "js": "/App_Plugins/OC.AutoLink/lang/en-gb.js",
+      "meta": {
+        "culture": "en-gb"
+      }
+    },
+    {
       "type": "section",
       "alias": "OC.AutoLink.Section",
       "name": "Auto-linking section",
       "weight": 40,
       "meta": {
-        "label": "Auto-linking",
+        "label": "#ocAutoLink_sectionName",
         "pathname": "auto-linking"
       }
     },
@@ -21,7 +30,7 @@
       "element": "/App_Plugins/OC.AutoLink/autolink-keywords.js",
       "weight": 10,
       "meta": {
-        "label": "Keywords",
+        "label": "#ocAutoLink_dashboardName",
         "pathname": "keywords"
       },
       "conditions": [

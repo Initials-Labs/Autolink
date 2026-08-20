@@ -721,11 +721,23 @@ has a visible focus ring.
 
 None of it has been through an actual screen reader. Sound structure, unverified behaviour.
 
+### Localisation
+
+Every string the screen shows lives in `wwwroot/lang/en-gb.js`, registered as a `localization` extension with
+`meta.culture: en-gb`. The element asks for terms through `this.localize.term('ocAutoLink_alias')`, and `%0%` tokens
+are filled in order, so nothing is assembled from sentence fragments in code. The section and dashboard names use the
+`#ocAutoLink_alias` convention in the manifest, the same way core does.
+
+To add a language: copy the file, translate the values, and register it with its own culture. Nothing else changes.
+
+The skip reasons were rewritten while doing this. They used to trail off from whatever preceded them — "also
+mentioned here, sits in a heading or an existing link" left the reader working out what *sits* anywhere. Each one now
+names its own subject, so it reads whether it follows "Not linked:" or "Another mention on this page."
+
 ### Still outstanding
 
 | Item | Why it is not done |
 |---|---|
-| Localisation | Dashboard strings are hardcoded English. Needed before a public release, not before internal use. |
 | Consumer documentation | This README is a build log. A shipping package needs a shorter one aimed at somebody installing it. |
 | Schema install as a migration | Still a startup fixup rather than a run-once migration, now that a plan exists to put it in. |
 | Delivery API | Delegated but not linked. Decide whether to support it or document it as out of scope. |
