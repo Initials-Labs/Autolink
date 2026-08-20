@@ -12,18 +12,18 @@ namespace OC.AutoLink.Persistence.Migrations;
 /// Rebuilt rather than altered, for the same reason as the culture migration: Umbraco's migration layer refuses
 /// ALTER TABLE outright on SQLite. Existing rows are page mappings, so the new columns are simply left null.
 /// </remarks>
-public sealed class AddExternalLinkColumns : MigrationBase
+public sealed class AddExternalLinkColumns : AsyncMigrationBase
 {
     public AddExternalLinkColumns(IMigrationContext context) : base(context)
     {
     }
 
-    protected override void Migrate()
+    protected override Task MigrateAsync()
     {
         if (!TableExists(KeywordMappingDto.TableName)
             || ColumnExists(KeywordMappingDto.TableName, "externalUrl"))
         {
-            return;
+            return Task.CompletedTask;
         }
 
         List<PageMappingDto> rows = Database.Fetch<PageMappingDto>(
@@ -49,6 +49,8 @@ public sealed class AddExternalLinkColumns : MigrationBase
             "Rebuilt {Table} with external link columns, preserving {Count} row(s).",
             KeywordMappingDto.TableName,
             rows.Count);
+
+        return Task.CompletedTask;
     }
 
     /// <summary>The mapping table as it was when every destination was a page.</summary>
