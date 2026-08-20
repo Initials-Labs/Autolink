@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OC.AutoLink.Api;
+using OC.AutoLink.Caching;
 using OC.AutoLink.Api.Security;
 using OC.AutoLink.Install;
 using OC.AutoLink.Linking;
@@ -10,6 +11,7 @@ using OC.AutoLink.Persistence;
 using OC.AutoLink.PropertyEditors;
 using OC.AutoLink.Registry;
 using OC.AutoLink.Scanning;
+using OC.AutoLink.Uninstall;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
@@ -27,9 +29,11 @@ public sealed class AutoLinkComposer : IComposer
             .AddOptions<AutoLinkOptions>()
             .Bind(builder.Config.GetSection(AutoLinkOptions.SectionName));
 
+        builder.Services.AddSingleton<IKeywordRegistryInvalidator, KeywordRegistryInvalidator>();
         builder.Services.AddSingleton<IKeywordMappingStore, KeywordMappingStore>();
         builder.Services.AddSingleton<IKeywordSuppressionStore, KeywordSuppressionStore>();
         builder.Services.AddSingleton<IAutoLinkScanner, AutoLinkScanner>();
+        builder.Services.AddSingleton<IAutoLinkUninstaller, AutoLinkUninstaller>();
         builder.Services.AddSingleton<IKeywordRegistry, KeywordRegistry>();
         builder.Services.AddSingleton<IAutoLinker, AutoLinker>();
 
@@ -40,25 +44,35 @@ public sealed class AutoLinkComposer : IComposer
         // Umbraco registers a policy per built-in section; ours needs registering the same way, with the same
         // requirement type its own section policies use, so access follows the user group section grant.
         builder.Services.AddSingleton<IAuthorizationHandler, SectionAccessHandler>();
+        builder.Services.AddSingleton<IAuthorizationHandler, AdministratorHandler>();
         builder.Services.AddAuthorization(options =>
+        {
             options.AddPolicy(AutoLinkApiConfiguration.PolicyName, policy =>
             {
                 policy.AuthenticationSchemes.Add(Constants.Security.BackOfficeAuthenticationType);
                 policy.Requirements.Add(new SectionAccessRequirement(AutoLinkApiConfiguration.SectionAlias));
-            }));
+            });
+
+            // Teardown is its own policy rather than a check inside the action, so the next destructive endpoint
+            // has something to inherit instead of inventing its own guard.
+            options.AddPolicy(AutoLinkApiConfiguration.TeardownPolicyName, policy =>
+            {
+                policy.AuthenticationSchemes.Add(Constants.Security.BackOfficeAuthenticationType);
+                policy.Requirements.Add(new AdministratorRequirement());
+            });
+        });
 
         // Gives the package endpoints their own document at /umbraco/swagger.
         builder.Services.ConfigureOptions<ConfigureAutoLinkSwaggerGenOptions>();
+
+        // Carries our own table changes to every server, the way Umbraco carries content changes.
+        builder.CacheRefreshers().Add<AutoLinkCacheRefresher>();
 
         builder.PropertyValueConverters()
             .Replace<RteBlockRenderingValueConverter, AutoLinkRichTextValueConverter>();
 
         builder
-            .AddNotificationHandler<ContentPublishedNotification, KeywordRegistryInvalidationHandler>()
-            .AddNotificationHandler<ContentUnpublishedNotification, KeywordRegistryInvalidationHandler>()
-            .AddNotificationHandler<ContentDeletedNotification, KeywordRegistryInvalidationHandler>()
-            .AddNotificationHandler<ContentMovedNotification, KeywordRegistryInvalidationHandler>()
-            .AddNotificationHandler<ContentMovedToRecycleBinNotification, KeywordRegistryInvalidationHandler>()
+            .AddNotificationHandler<ContentCacheRefresherNotification, KeywordRegistryInvalidationHandler>()
             .AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, AutoLinkMigrationHandler>()
             .AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, AutoLinkSchemaInstaller>();
     }

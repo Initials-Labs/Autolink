@@ -13,7 +13,7 @@ it — no republishing, no backfill, because stored markup is never touched.
 |---|---|
 | `src/OC.AutoLink/` | The package. Start with its [README](src/OC.AutoLink/README.md) — design, evidence, measurements and the v17 traps. |
 | `Autolink/` | An Umbraco 17 site with the Clean starter kit, used to build and verify it. |
-| `Autolink/Demo/` | Development-only HTTP harness for driving the whole thing without clicking through the backoffice. |
+| `tests/OC.AutoLink.Tests/` | Unit tests over the linker and the resolution rules. |
 | `CLAUDE.md` | The design decisions and why the rejected alternatives were rejected. |
 
 ## Running it

@@ -34,11 +34,6 @@ public sealed class AutoLinkOptions
     public string ExternalLinkRel { get; set; } = "nofollow";
 
     /// <summary>
-    /// What happens to a keyword two or more pages claim with no manual mapping to settle it.
-    /// </summary>
-    public UnresolvedCollisionBehaviour OnUnresolvedCollision { get; set; } = UnresolvedCollisionBehaviour.Skip;
-
-    /// <summary>
     /// How many times a single keyword may be linked on one page. SEO caution — the first mention is the useful one.
     /// </summary>
     public int MaxLinksPerKeyword { get; set; } = 1;
@@ -61,17 +56,20 @@ public sealed class AutoLinkOptions
     /// <summary>
     /// Document type aliases the schema installer adds the keyword properties to. Empty disables the installer.
     /// </summary>
-    public string[] InstallOnDocumentTypes { get; set; } = ["article", "content", "home", "category", "author"];
+    /// <remarks>
+    /// Empty by default. Guessing alias names on somebody else's site was fine for a spike and wrong for a package:
+    /// installing a property onto document types nobody nominated is not a decision a package gets to make.
+    /// </remarks>
+    public string[] InstallOnDocumentTypes { get; set; } = [];
 
     /// <summary>
-    /// When true, ensures the Tags datatype and keyword properties exist at startup. PoC convenience so the
-    /// demo is reproducible from a clean database; a real package would use a migration plan.
+    /// When true, ensures the Tags datatype and keyword properties exist at startup.
     /// </summary>
-    public bool InstallSchema { get; set; } = true;
-
-    /// <summary>
-    /// Hardcoded keyword to URL pairs, merged over whatever the tags query finds. This is the Spike 0 escape
-    /// hatch — it proves the render pipeline without any content setup at all.
-    /// </summary>
-    public Dictionary<string, string> DebugKeywords { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    /// <remarks>
+    /// Off by default: installing it means a package editing document types every time the site boots, which is
+    /// nobody's expectation. Turn it on to have the schema created for you, or create the Tags datatype and the two
+    /// properties yourself and leave this alone. Moving the work into the migration plan, so it runs once rather
+    /// than at every startup, is the outstanding improvement here.
+    /// </remarks>
+    public bool InstallSchema { get; set; }
 }

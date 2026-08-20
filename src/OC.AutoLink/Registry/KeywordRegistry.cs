@@ -184,7 +184,7 @@ public sealed class KeywordRegistry : IKeywordRegistry
                 culture);
         }
 
-        // Sorted once, after both passes: stable order so the FirstByUrl fallback and the backoffice list do not
+        // Sorted once, after both passes: stable order so the backoffice conflict list does not
         // shuffle between rebuilds.
         foreach (List<KeywordCandidate> claimants in candidates.Values)
         {
@@ -208,29 +208,10 @@ public sealed class KeywordRegistry : IKeywordRegistry
             }
         }
 
-        foreach ((string keyword, string url) in options.DebugKeywords)
-        {
-            string trimmed = keyword.Trim();
-            if (trimmed.Length > 0)
-            {
-                targets[trimmed] = new KeywordTarget(trimmed, Guid.Empty, url, trimmed, KeywordSource.Debug);
-            }
-        }
-
         IReadOnlyDictionary<string, IReadOnlyList<KeywordCandidate>> frozenCandidates = candidates.ToDictionary(
             pair => pair.Key,
             pair => (IReadOnlyList<KeywordCandidate>)pair.Value,
             StringComparer.OrdinalIgnoreCase);
-
-        // Contested keywords go into the matcher even though they resolve to nothing, so they still claim their
-        // span. Regex.Matches is non-overlapping and the alternation is longest first, so a shorter keyword cannot
-        // match inside a contested phrase. Without this, dropping "content editor" for being contested lets
-        // "editor" link the same words to a third page that was never a candidate.
-        var matchable = new HashSet<string>(targets.Keys, StringComparer.OrdinalIgnoreCase);
-        foreach (KeywordConflict conflict in conflicts)
-        {
-            matchable.Add(conflict.Keyword);
-        }
 
         return new CultureKeywordSet(
             culture,
@@ -238,7 +219,7 @@ public sealed class KeywordRegistry : IKeywordRegistry
             frozenCandidates,
             conflicts,
             suppressions,
-            matchable.Count == 0 ? null : BuildMatcher(matchable));
+            KeywordMatcher.For(targets.Keys, conflicts));
     }
 
     /// <summary>
@@ -381,11 +362,11 @@ public sealed class KeywordRegistry : IKeywordRegistry
             return null;
         }
 
+        // Contested, and nothing settles it: report it and link nothing. A confidently wrong link is worse than no
+        // link, and an unlinked keyword is what sends somebody to the dashboard to make the call.
         conflicts.Add(new KeywordConflict(keyword, claimants));
 
-        return options.OnUnresolvedCollision == UnresolvedCollisionBehaviour.FirstByUrl
-            ? new KeywordTarget(keyword, claimants[0].TargetKey, claimants[0].Url, claimants[0].TargetName, KeywordSource.Tag)
-            : null;
+        return null;
     }
 
     /// <summary>
@@ -428,34 +409,6 @@ public sealed class KeywordRegistry : IKeywordRegistry
     }
 
     private static bool IsRoutable(string? url) => !string.IsNullOrWhiteSpace(url) && url != "#";
-
-    /// <summary>
-    /// One compiled alternation for the whole keyword set. Sorted longest first so that where two keywords
-    /// start at the same position the more specific one wins.
-    /// </summary>
-    private static Regex BuildMatcher(IEnumerable<string> keywords)
-    {
-        string pattern = string.Join(
-            '|',
-            keywords
-                .OrderByDescending(k => k.Length)
-                .ThenBy(k => k, StringComparer.Ordinal)
-                .Select(ToBoundedPattern));
-
-        return new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.CultureInvariant);
-    }
-
-    /// <summary>
-    /// Word boundaries are applied per keyword rather than around the whole alternation, because \b only does
-    /// the right thing next to a word character. Wrapping the group would stop "C#" ever matching.
-    /// </summary>
-    private static string ToBoundedPattern(string keyword)
-    {
-        string escaped = Regex.Escape(keyword);
-        string left = char.IsLetterOrDigit(keyword[0]) ? @"\b" : string.Empty;
-        string right = char.IsLetterOrDigit(keyword[^1]) ? @"\b" : string.Empty;
-        return $"{left}{escaped}{right}";
-    }
 
     /// <summary>
     /// Hashes every culture's resolved targets, candidates and suppressions together. Changes only when the

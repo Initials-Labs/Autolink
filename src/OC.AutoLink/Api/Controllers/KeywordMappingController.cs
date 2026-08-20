@@ -116,10 +116,6 @@ public sealed class KeywordMappingController : AutoLinkControllerBase
 
         _store.Save(model.Keyword, destination, User.Identity?.Name, model.Culture ?? string.Empty);
 
-        // The stamp only moves if this actually changed where the keyword points, so re-saving the same
-        // decision costs a rebuild and nothing else.
-        _registry.Invalidate();
-
         return Ok();
     }
 
@@ -137,11 +133,6 @@ public sealed class KeywordMappingController : AutoLinkControllerBase
         }
 
         bool removed = _store.Delete(keyword, culture ?? string.Empty);
-
-        if (removed)
-        {
-            _registry.Invalidate();
-        }
 
         return Ok(new { removed });
     }

@@ -86,9 +86,15 @@ character, so wrapping the group would stop `C#` ever matching.
 
 ### 3. Invalidation
 
-Global, via `ContentPublished` / `ContentUnpublished` / `ContentDeleted` / `ContentMoved` /
-`ContentMovedToRecycleBin`. Any page's output depends on the whole keyword set, and you cannot know which
-pages mention which keywords without rendering them.
+Global, via `ContentCacheRefresherNotification` — one hook where five content notifications used to be. Any
+page's output depends on the whole keyword set, and you cannot know which pages mention which keywords without
+rendering them.
+
+The choice of hook matters twice over. `ContentPublished` fires *inside* the publish, before the published cache
+has settled, so a render at that moment can rebuild from stale content and then mark itself clean, staying stale
+until the next content change. It also only fires on the server that did the publishing — other nodes learn about
+content changes through the distributed cache, which runs their refreshers, which raises this notification
+there too.
 
 The stamp is a **content hash of the built dictionary**, not a publish counter. A rebuild that produces an
 identical keyword and URL set keeps the existing snapshot, so a typo fix on a target page does not move the
@@ -132,11 +138,9 @@ first, and the loser was dropped silently. Nothing anywhere recorded that a seco
 
 Unresolved keywords are **left out of the matcher entirely**, so the phrase renders as plain text and lands in
 `KeywordSnapshot.Conflicts`. That is a deliberate change from first-past-the-post: a confidently wrong link is
-worse than no link, and an unlinked keyword is what sends somebody to the mapping screen to make the call. Set
-`OnUnresolvedCollision: "FirstByUrl"` to link the first candidate by URL instead — deterministic across
-restarts, unlike the original tag-query order, but still a guess.
+worse than no link, and an unlinked keyword is what sends somebody to the mapping screen to make the call.
 
-Candidate lists are sorted by URL, so the fallback and the backoffice list do not shuffle between rebuilds.
+Candidate lists are sorted by URL, so the backoffice list does not shuffle between rebuilds.
 
 **A contested keyword stays in the matcher even though it resolves to nothing**, so it still claims its span.
 `Regex.Matches` is non-overlapping and the alternation is longest first, so this stops a shorter keyword matching
@@ -546,27 +550,26 @@ is fast enough that a stamp-keyed `IAppPolicyCache` is not worth the complexity 
       "KeywordsPropertyAlias": "linkKeywords",
       "ExcludePropertyAlias": "excludeFromAutoLinking",
       "ExternalLinkRel": "nofollow",
-      "OnUnresolvedCollision": "Skip",
       "MaxLinksPerKeyword": 1,
       "MaxLinksPerPage": 25,
       "InstallSchema": true,
-      "InstallOnDocumentTypes": [ "article", "content", "home", "category", "author" ],
-      "DebugKeywords": {}
+      "InstallOnDocumentTypes": [ "article", "content", "home", "category", "author" ]
     }
   }
 }
 ```
 
-`TagGroup` **must match the group declared by the datatype bound to `linkKeywords`**, or nothing links. The dev
-config uses `default` because the properties on this site are bound to Umbraco's stock Tags datatype. That works,
-but `default` is the catch-all group: any other stock Tags property on the site would feed keywords into the
-linker. A shipping package wants its own datatype and its own group, which is what `InstallSchema` creates —
-just check the doctype property actually points at it. `tagconfig?nodeId=` tells you.
+`TagGroup` **must match the group declared by the datatype bound to `linkKeywords`**, or nothing links.
+Umbraco's stock Tags datatype declares the catch-all `default` group, so pointing at that feeds every other
+stock Tags property on the site into the linker. Give the linker its own datatype and its own group — which is
+what `InstallSchema` creates — then check the doctype property actually points at it.
 
-`OnUnresolvedCollision` is `Skip` or `FirstByUrl`; see collisions above.
-
-`DebugKeywords` is the Spike 0 escape hatch: hardcoded keyword to URL pairs merged over the tags query, so the
-render pipeline can be proved with no content setup at all.
+> **This is the setup trap, and it fails silently.** Tag relations are written into the group the *datatype*
+> declares, and the registry only ever queries `TagGroup`. Bind `linkKeywords` to the stock Tags datatype (group
+> `default`) while `TagGroup` says `autolink`, and every save works perfectly, writes real relations, and the
+> registry sees nothing. The property shows the keywords in the content editor the whole time, so nothing looks
+> broken. The dashboard's empty state says as much — check which datatype the property is bound to before
+> assuming the linker is broken.
 
 Bound through `IOptionsMonitor`, so edits apply **without a restart**.
 
@@ -583,46 +586,6 @@ migration plan. Set `InstallSchema: false` to turn it off.
 > regenerates the models under already-compiled views, and the first page load after install fails with
 > `ModelBindingException: ... application is in an unstable state and should be restarted`. Restart once and
 > it is gone — the installer is idempotent so it makes no changes on subsequent boots.
-
----
-
-## Demo harness
-
-`Autolink/Demo/AutoLinkDemoController.cs` (Development only, and in the site project rather than the package).
-Drives the spikes without clicking through the backoffice, using the real content services so the genuine
-`ContentPublishedNotification` fires.
-
-```
-GET /autolink-demo/status                        current keyword set and stamp
-GET /autolink-demo/tag?nodeId=1121&keywords=a,b  set keywords and publish
-GET /autolink-demo/untag?nodeId=1121             clear keywords and publish
-GET /autolink-demo/unpublish?nodeId=1121         unpublish a target
-GET /autolink-demo/republish?nodeId=1121         republish unchanged
-GET /autolink-demo/nodes                         nodes that can carry keywords, with ids
-GET /autolink-demo/tags?group=default            raw tag store and tags-query view (empty group = all)
-GET /autolink-demo/tagconfig?nodeId=1121         datatype and tag group bound to the keyword property
-GET /autolink-demo/invalidate                    mark the registry stale without reading it back
-GET /autolink-demo/mappings                      stored manual mappings
-GET /autolink-demo/map?keyword=a&nodeId=1121     pin a keyword, as the backoffice screen does
-GET /autolink-demo/unmap?keyword=a               back to automatic resolution
-GET /autolink-demo/scan                          dry-run audit of every published page
-GET /autolink-demo/suppress?keyword=a&nodeId=0   switch a keyword off (nodeId 0 = everywhere)
-GET /autolink-demo/allow?keyword=a&nodeId=0      switch it back on
-GET /autolink-demo/suppressions                  stored suppressions
-GET /autolink-demo/cultures                      languages, and per culture what the tag store and query hold
-GET /autolink-demo/map?keyword=a&nodeId=1&culture=en-US    decisions take an optional culture, blank for all
-```
-
-> **The tag group is the setup trap, and it fails silently.** Tag relations are written into the group the
-> *datatype* declares, and the registry only queries `TagGroup`. Bind `linkKeywords` to Umbraco's stock **Tags**
-> datatype (group `default`) while `TagGroup` says `autolink`, and every save works perfectly, writes real
-> relations, and the registry sees nothing. The property shows the keywords in the content editor the whole time,
-> so nothing looks broken. `tagconfig?nodeId=` prints the datatype and group actually bound to the property, and
-> `tags?group=` (empty for every group) shows where the relations really landed. Those two answer this in one
-> request each — worth reaching for before assuming the linker is broken.
-
-> `invalidate` exists because reading `_registry.Current` inside the same request that published something
-> rebuilds against a cache that has not settled, which looks exactly like the registry losing keywords.
 
 ---
 
@@ -660,6 +623,120 @@ GET /autolink-demo/map?keyword=a&nodeId=1&culture=en-US    decisions take an opt
   matters, since only the first mention is linked anyway.
 - **Conflicts are only visible once both pages are published.** The registry reads the published cache, so a
   contested keyword on an unpublished draft does not show up until it goes live.
+
+---
+
+## Production readiness
+
+Fixed, with the reasoning worth keeping:
+
+- **Invalidation hooks the cache refresher, not ContentPublished.** `ContentPublishedNotification` fires inside the
+  publish, before the published cache settles, so a render at that moment could rebuild from stale content and mark
+  itself clean — stale until the next content change. It also only fired on the publishing node.
+  `ContentCacheRefresherNotification` fires after the cache updates and on every node, so one hook replaced five and
+  fixed cross-node invalidation at the same time.
+- **Decision writes go through the distributed cache.** The mapping and suppression tables are ours, so no Umbraco
+  refresher carries them: a decision saved on one node left every other node serving old links. There is now a
+  registered `ICacheRefresher` and writes call `DistributedCache.RefreshAll`.
+- **Migrations use `AsyncMigrationBase`.** `MigrationBase` is obsolete and scheduled for removal in Umbraco 18.
+- **AngleSharp 1.7.1**, clearing GHSA-pgww-w46g-26qg. It runs on every page render, so an advisory there is not
+  something to carry.
+- **The schema installer is opt-in and nominates nothing.** `InstallSchema` defaults to false and
+  `InstallOnDocumentTypes` to empty. Guessing alias names was fine for a spike; a package editing document types at
+  every boot, on types nobody nominated, is not.
+- **41 tests**, covering what must not silently regress: word boundaries, longest-keyword-first, skipped elements,
+  never nesting an anchor, not rewriting attributes, the per-keyword cap, hand-link detection, self-linking, external
+  markup and rel, contested keywords reserving their span, culture fallback, decision precedence, and the narrowest
+  suppression row winning. Verified by mutation: breaking longest-first fails a test.
+- **Warnings are errors** in the package, and CI fails the build if the dashboard or the backoffice manifest stops
+  being packed.
+
+### Removing the package
+
+Umbraco has no uninstall hook for a package delivered over NuGet: removing the reference removes the assembly and
+leaves the tables. So teardown is an explicit call.
+
+```
+DELETE /umbraco/management/api/v1/autolink/data?confirm=remove-autolink-data
+```
+
+It drops both decision tables and **resets the migration state**, which is the part that matters. Dropping the tables
+while `umbracoKeyValue` still records the plan as complete means a reinstall never recreates them, and the package
+comes back up permanently broken with stores that log and return empty.
+
+Document types are left alone on purpose. The keyword property holds editors' data, and deleting it would take every
+keyword on every page with it. Delete the property yourself if you want it gone.
+
+Deliberately not a button in the dashboard: a destructive action one click from the screen editors use every day is a
+mistake waiting to happen. The confirmation token exists for the same reason.
+
+**It needs an administrator, not just section access.** Every other endpoint here is gated on access to the
+Auto-linking section, which is the permission an editor settling keyword collisions holds — not the permission to drop
+both tables. So teardown carries a second policy requiring the admin group, and both apply: the administrator running
+it needs the section granted too, which is the same tick that let them open the dashboard. The token stops a mistake;
+it was never authorization.
+
+### Accessibility
+
+The keyword list has **list semantics, not table roles**. It looks like a table, but each row contains its own detail
+panel, and no table role permits that — `role="row"` with a non-cell child is invalid and screen readers handle it
+unpredictably. A list of keywords with expandable regions is what it actually is.
+
+Each toggle has a real name (`Show detail for Harrie`, not an unlabelled glyph), `aria-controls` pointing at its
+panel, and the panel is a labelled region. The chevron and the external arrow are `aria-hidden`, so the pill reads
+"external" rather than "external north east arrow". The language switcher is a labelled group with `aria-pressed`,
+the header row is hidden from assistive tech because column labels mean nothing in a list, and the one custom control
+has a visible focus ring.
+
+None of it has been through an actual screen reader. Sound structure, unverified behaviour.
+
+### Localisation
+
+Every string the screen shows lives in `wwwroot/lang/en.js`, and the element asks for terms through
+`this.localize.term('ocAutoLink_alias')`. Section and dashboard names use the `#ocAutoLink_alias` convention in the
+manifest, the same way core does.
+
+To add a language: copy the file, translate the values, and register it with its own culture. Nothing else changes.
+
+Two things caught me out, both worth knowing before writing one of these:
+
+- **A term that takes values is a function, not a token string.** `%0%` substitution is the pre-v14 convention and
+  renders literally now. Terms are `(count) => count === 1 ? '1 keyword' : \`${count} keywords\``, which is also why
+  pluralisation belongs in the language file rather than being assembled from fragments in the element.
+- **There is no fallback from a specific culture to its base.** A dictionary registered only for `en-gb` never loads
+  for a backoffice user set to English (United States), and nothing errors — the terms simply do not resolve. Core
+  ships both `en.js` and `en-us.js` for this reason. This one is registered for `en`, `en-gb` and `en-us`, all
+  pointing at the same file.
+
+The skip reasons were rewritten while doing this. They used to trail off from whatever preceded them — "also
+mentioned here, sits in a heading or an existing link" left the reader working out what *sits* anywhere. Each one now
+names its own subject, so it reads whether it follows "Not linked:" or "Another mention on this page."
+
+### Still outstanding
+
+| Item | Why it is not done |
+|---|---|
+| Consumer documentation | This README is a build log. A shipping package needs a shorter one aimed at somebody installing it. |
+| Schema install as a migration | Still a startup fixup rather than a run-once migration, now that a plan exists to put it in. |
+| Delivery API | Delegated but not linked. Decide whether to support it or document it as out of scope. |
+| Accessibility, verified | The structure is sound, but nothing has been through a screen reader. |
+| Segments | `VariationContext` carries a segment as well as a culture; only culture is used. |
+| Narrowing what invalidates the registry | See below. Needs verifying against a real publish before it can be trusted. |
+
+#### Invalidation is wider than it looks
+
+`ContentCacheRefresherNotification` fires for **plain draft saves**, not just publishes: `ContentService.Save`
+raises a tree change, Umbraco's own handler turns that into `RefreshContentCache`, and that raises this
+notification. So saving a draft of any page marks the registry stale, and the next render pays for a rebuild whose
+content hash almost always comes out identical — the stamp does not move, so cached output survives, but the tags
+query and the URL resolution are done again for nothing.
+
+The payload (`ContentCacheRefresher.JsonPayload[]`) carries `ChangeTypes`, `PublishedCultures` and
+`UnpublishedCultures`, so the handler could invalidate only on a publish-state change. It is not done yet because
+getting it wrong fails in the direction that matters: a publish that does not invalidate is a keyword that never
+starts linking, which is the entire feature. This site has already been bitten twice by invariant content taking a
+different path from varying content, so the filter wants verifying against both before it ships — not reasoning
+about.
 
 ---
 

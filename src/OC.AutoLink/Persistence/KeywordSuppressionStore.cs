@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using OC.AutoLink.Caching;
 using NPoco;
 using Umbraco.Cms.Infrastructure.Persistence;
 using Umbraco.Cms.Infrastructure.Scoping;
@@ -49,11 +50,16 @@ public interface IKeywordSuppressionStore
 public sealed class KeywordSuppressionStore : IKeywordSuppressionStore
 {
     private readonly IScopeProvider _scopeProvider;
+    private readonly IKeywordRegistryInvalidator _invalidator;
     private readonly ILogger<KeywordSuppressionStore> _logger;
 
-    public KeywordSuppressionStore(IScopeProvider scopeProvider, ILogger<KeywordSuppressionStore> logger)
+    public KeywordSuppressionStore(
+        IScopeProvider scopeProvider,
+        IKeywordRegistryInvalidator invalidator,
+        ILogger<KeywordSuppressionStore> logger)
     {
         _scopeProvider = scopeProvider;
+        _invalidator = invalidator;
         _logger = logger;
     }
 
@@ -94,8 +100,17 @@ public sealed class KeywordSuppressionStore : IKeywordSuppressionStore
             throw new ArgumentException("A suppression needs a keyword.", nameof(keyword));
         }
 
-        string key = DecisionKey.Normalise(trimmed);
+        if (Insert(DecisionKey.Normalise(trimmed), trimmed, pageKey, culture, createdBy))
+        {
+            // Invalidated here rather than by the caller, for the same reason as the mapping store: this is the
+            // code that knows a row appeared, and an invalidation nobody sends leaves the other servers linking
+            // a keyword this page just switched off.
+            _invalidator.InvalidateEverywhere();
+        }
+    }
 
+    private bool Insert(string key, string keyword, Guid pageKey, string culture, string? createdBy)
+    {
         using IScope scope = _scopeProvider.CreateScope(autoComplete: true);
 
         Sql<ISqlContext> existing = scope.SqlContext.Sql()
@@ -106,18 +121,20 @@ public sealed class KeywordSuppressionStore : IKeywordSuppressionStore
         if (scope.Database.FirstOrDefault<KeywordSuppressionDto>(existing) is not null)
         {
             // Suppressing twice is not an error, it is the same decision.
-            return;
+            return false;
         }
 
         scope.Database.Insert(new KeywordSuppressionDto
         {
             KeywordKey = key,
-            Keyword = trimmed,
+            Keyword = keyword,
             Culture = culture,
             PageKey = pageKey,
             CreateDate = DateTime.UtcNow,
             CreatedBy = createdBy,
         });
+
+        return true;
     }
 
     /// <inheritdoc />
@@ -126,12 +143,22 @@ public sealed class KeywordSuppressionStore : IKeywordSuppressionStore
         string key = DecisionKey.Normalise(keyword);
         culture = DecisionKey.Normalise(culture);
 
-        using IScope scope = _scopeProvider.CreateScope(autoComplete: true);
+        bool removed;
 
-        Sql<ISqlContext> sql = scope.SqlContext.Sql()
-            .Delete<KeywordSuppressionDto>()
-            .Where<KeywordSuppressionDto>(x => x.KeywordKey == key && x.PageKey == pageKey && x.Culture == culture);
+        using (IScope scope = _scopeProvider.CreateScope(autoComplete: true))
+        {
+            Sql<ISqlContext> sql = scope.SqlContext.Sql()
+                .Delete<KeywordSuppressionDto>()
+                .Where<KeywordSuppressionDto>(x => x.KeywordKey == key && x.PageKey == pageKey && x.Culture == culture);
 
-        return scope.Database.Execute(sql) > 0;
+            removed = scope.Database.Execute(sql) > 0;
+        }
+
+        if (removed)
+        {
+            _invalidator.InvalidateEverywhere();
+        }
+
+        return removed;
     }
 }

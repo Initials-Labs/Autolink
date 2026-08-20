@@ -19,4 +19,10 @@ public static class AutoLinkApiConfiguration
     /// own section policies use.
     /// </summary>
     public const string PolicyName = "OC.AutoLink.SectionAccess";
+
+    /// <summary>
+    /// Authorization policy for destroying stored decisions. Separate from <see cref="PolicyName"/> because
+    /// everyday editing and irreversible teardown are not the same permission.
+    /// </summary>
+    public const string TeardownPolicyName = "OC.AutoLink.Teardown";
 }

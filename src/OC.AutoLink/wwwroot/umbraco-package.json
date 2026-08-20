@@ -5,12 +5,39 @@
   "allowTelemetry": false,
   "extensions": [
     {
+      "type": "localization",
+      "alias": "OC.AutoLink.Localization.enus",
+      "name": "Auto-link English (en-us)",
+      "js": "/App_Plugins/OC.AutoLink/lang/en.js",
+      "meta": {
+        "culture": "en-us"
+      }
+    },
+    {
+      "type": "localization",
+      "alias": "OC.AutoLink.Localization.engb",
+      "name": "Auto-link English (en-gb)",
+      "js": "/App_Plugins/OC.AutoLink/lang/en.js",
+      "meta": {
+        "culture": "en-gb"
+      }
+    },
+    {
+      "type": "localization",
+      "alias": "OC.AutoLink.Localization.en",
+      "name": "Auto-link English (en)",
+      "js": "/App_Plugins/OC.AutoLink/lang/en.js",
+      "meta": {
+        "culture": "en"
+      }
+    },
+    {
       "type": "section",
       "alias": "OC.AutoLink.Section",
       "name": "Auto-linking section",
       "weight": 40,
       "meta": {
-        "label": "Auto-linking",
+        "label": "#ocAutoLink_sectionName",
         "pathname": "auto-linking"
       }
     },
@@ -21,7 +48,7 @@
       "element": "/App_Plugins/OC.AutoLink/autolink-keywords.js",
       "weight": 10,
       "meta": {
-        "label": "Keywords",
+        "label": "#ocAutoLink_dashboardName",
         "pathname": "keywords"
       },
       "conditions": [

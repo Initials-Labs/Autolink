@@ -10,12 +10,42 @@
     <!-- Razor SDK so wwwroot/ ships as static web assets. The base path is where the host app serves them
          from, which is what makes Umbraco's package manifest scan find umbraco-package.json. -->
     <StaticWebAssetBasePath>App_Plugins/OC.AutoLink</StaticWebAssetBasePath>
+    <!-- Warnings are errors here: this is a package, and a warning that ships is a warning nobody reads. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
+
+  <PropertyGroup Label="Package">
+    <PackageId>OC.AutoLink</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>Owain Williams</Authors>
+    <Company>Owain Williams</Company>
+    <Title>OC.AutoLink for Umbraco</Title>
+    <Description>
+      Turns keyword mentions in Umbraco rich text into links to the corresponding page, at render time, with no
+      editor action required. Stored markup is never modified, so an article picks up a link the day somebody
+      creates its target. Includes a backoffice section for settling keywords two pages both claim, switching
+      individual links off, and pointing keywords at external URLs. Multilingual.
+    </Description>
+    <PackageTags>umbraco;umbraco-marketplace;seo;internal-linking;rich-text</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/OwainWilliams/OC.AutoLink</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/OwainWilliams/OC.AutoLink</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Copyright>Copyright (c) 2026 Owain Williams</Copyright>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <GenerateRepositoryUrlAttribute>true</GenerateRepositoryUrlAttribute>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Umbraco.Cms.Web.Website" Version="17.6.1" />
     <PackageReference Include="Umbraco.Cms.Api.Management" Version="17.6.1" />
-    <PackageReference Include="AngleSharp" Version="1.4.0" />
+    <PackageReference Include="AngleSharp" Version="1.7.1" />
   </ItemGroup>
 
 </Project>

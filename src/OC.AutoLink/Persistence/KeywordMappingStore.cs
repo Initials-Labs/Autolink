@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using OC.AutoLink.Caching;
 using NPoco;
 using Umbraco.Cms.Infrastructure.Persistence;
 using Umbraco.Cms.Infrastructure.Scoping;
@@ -10,11 +11,16 @@ namespace OC.AutoLink.Persistence;
 public sealed class KeywordMappingStore : IKeywordMappingStore
 {
     private readonly IScopeProvider _scopeProvider;
+    private readonly IKeywordRegistryInvalidator _invalidator;
     private readonly ILogger<KeywordMappingStore> _logger;
 
-    public KeywordMappingStore(IScopeProvider scopeProvider, ILogger<KeywordMappingStore> logger)
+    public KeywordMappingStore(
+        IScopeProvider scopeProvider,
+        IKeywordRegistryInvalidator invalidator,
+        ILogger<KeywordMappingStore> logger)
     {
         _scopeProvider = scopeProvider;
+        _invalidator = invalidator;
         _logger = logger;
     }
 
@@ -61,8 +67,17 @@ public sealed class KeywordMappingStore : IKeywordMappingStore
             throw new ArgumentException("A mapping needs a keyword.", nameof(keyword));
         }
 
-        string key = DecisionKey.Normalise(trimmed);
+        Write(DecisionKey.Normalise(trimmed), trimmed, culture, destination, updatedBy);
 
+        // Invalidated here rather than by the caller. This is the code that knows the rows changed, and an
+        // invalidation nobody sends leaves every other server resolving the keyword the old way until the next
+        // content change. The stamp is a content hash, so re-saving the same decision costs a rebuild and nothing
+        // else.
+        _invalidator.InvalidateEverywhere();
+    }
+
+    private void Write(string key, string keyword, string culture, KeywordDestination destination, string? updatedBy)
+    {
         using IScope scope = _scopeProvider.CreateScope(autoComplete: true);
 
         Sql<ISqlContext> sql = scope.SqlContext.Sql()
@@ -77,14 +92,14 @@ public sealed class KeywordMappingStore : IKeywordMappingStore
             scope.Database.Insert(Apply(new KeywordMappingDto
             {
                 KeywordKey = key,
-                Keyword = trimmed,
+                Keyword = keyword,
                 Culture = culture,
             }, destination, updatedBy));
 
             return;
         }
 
-        existing.Keyword = trimmed;
+        existing.Keyword = keyword;
         scope.Database.Update(Apply(existing, destination, updatedBy));
     }
 
@@ -94,13 +109,27 @@ public sealed class KeywordMappingStore : IKeywordMappingStore
         string key = DecisionKey.Normalise(keyword);
         culture = DecisionKey.Normalise(culture);
 
-        using IScope scope = _scopeProvider.CreateScope(autoComplete: true);
+        bool removed;
 
-        Sql<ISqlContext> sql = scope.SqlContext.Sql()
-            .Delete<KeywordMappingDto>()
-            .Where<KeywordMappingDto>(x => x.KeywordKey == key && x.Culture == culture);
+        using (IScope scope = _scopeProvider.CreateScope(autoComplete: true))
+        {
+            Sql<ISqlContext> sql = scope.SqlContext.Sql()
+                .Delete<KeywordMappingDto>()
+                .Where<KeywordMappingDto>(x => x.KeywordKey == key && x.Culture == culture);
 
-        return scope.Database.Execute(sql) > 0;
+            removed = scope.Database.Execute(sql) > 0;
+        }
+
+        if (removed)
+        {
+            // Invalidated here rather than by the caller. This is the code that knows the rows changed, and an
+            // invalidation nobody sends leaves every other server resolving the keyword the old way until the next
+            // content change. The stamp is a content hash, so re-saving the same decision costs a rebuild and nothing
+            // else.
+            _invalidator.InvalidateEverywhere();
+        }
+
+        return removed;
     }
 
     /// <summary>

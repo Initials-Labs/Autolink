@@ -313,7 +313,7 @@ public sealed class AutoLinkScanner : IAutoLinkScanner
                 return;
 
             case IHtmlEncodedString html:
-                string text = html.ToHtmlString();
+                string? text = html.ToHtmlString();
                 if (!string.IsNullOrWhiteSpace(text))
                 {
                     markup.Add(text);

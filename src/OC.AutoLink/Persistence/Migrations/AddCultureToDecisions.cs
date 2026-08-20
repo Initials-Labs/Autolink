@@ -15,16 +15,18 @@ namespace OC.AutoLink.Persistence.Migrations;
 /// Existing rows get an empty culture, meaning "every culture", which is exactly what they meant when the site had
 /// only one.
 /// </remarks>
-public sealed class AddCultureToDecisions : MigrationBase
+public sealed class AddCultureToDecisions : AsyncMigrationBase
 {
     public AddCultureToDecisions(IMigrationContext context) : base(context)
     {
     }
 
-    protected override void Migrate()
+    protected override Task MigrateAsync()
     {
         RebuildMappings();
         RebuildSuppressions();
+
+        return Task.CompletedTask;
     }
 
     private void RebuildMappings()

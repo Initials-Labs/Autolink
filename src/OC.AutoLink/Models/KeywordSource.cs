@@ -14,7 +14,4 @@ public enum KeywordSource
 
     /// <summary>A hand-made link to somewhere outside the site. No page behind it.</summary>
     External,
-
-    /// <summary>Configured in <see cref="AutoLinkOptions.DebugKeywords"/>. Wins over everything.</summary>
-    Debug,
 }

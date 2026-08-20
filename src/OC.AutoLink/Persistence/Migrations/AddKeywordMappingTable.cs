@@ -6,20 +6,22 @@ namespace OC.AutoLink.Persistence.Migrations;
 /// <summary>
 /// Creates the manual mapping table.
 /// </summary>
-public sealed class AddKeywordMappingTable : MigrationBase
+public sealed class AddKeywordMappingTable : AsyncMigrationBase
 {
     public AddKeywordMappingTable(IMigrationContext context) : base(context)
     {
     }
 
-    protected override void Migrate()
+    protected override Task MigrateAsync()
     {
         if (TableExists(KeywordMappingDto.TableName))
         {
             Logger.LogDebug("{Table} already exists, skipping.", KeywordMappingDto.TableName);
-            return;
+            return Task.CompletedTask;
         }
 
         Create.Table<KeywordMappingDto>().Do();
+
+        return Task.CompletedTask;
     }
 }

@@ -5,32 +5,28 @@ using Umbraco.Cms.Core.Notifications;
 namespace OC.AutoLink.Notifications;
 
 /// <summary>
-/// Marks the keyword registry stale whenever content changes.
+/// Marks the keyword registry stale whenever the published content cache changes.
 /// </summary>
 /// <remarks>
-/// Invalidation is global rather than per target, and deliberately so: any page's output depends on the whole
-/// keyword set, and there is no way to know which pages mention which keywords without rendering them. The
-/// cost of being coarse is paid back by the registry itself, which only moves its stamp when the rebuilt
-/// keyword set actually hashes differently.
+/// Hooked to the cache refresher rather than to ContentPublished, and for two reasons that both bite in production.
+/// <para>
+/// ContentPublished fires <em>inside</em> the publish, before the published cache has settled, so a render happening
+/// at that moment could rebuild from stale content and then mark itself clean — staying stale until the next content
+/// change. The refresher notification fires after the cache is actually updated.
+/// </para>
+/// <para>
+/// It also only fired on the server that did the publishing. Other nodes learn about content changes through the
+/// distributed cache, which runs their refreshers, which raises this notification there too. So one hook replaces
+/// five and covers every server.
+/// </para>
+/// Invalidation stays deliberately global: any page's output depends on the whole keyword set, and the registry only
+/// moves its stamp when a rebuild actually hashes differently.
 /// </remarks>
-public sealed class KeywordRegistryInvalidationHandler :
-    INotificationHandler<ContentPublishedNotification>,
-    INotificationHandler<ContentUnpublishedNotification>,
-    INotificationHandler<ContentDeletedNotification>,
-    INotificationHandler<ContentMovedNotification>,
-    INotificationHandler<ContentMovedToRecycleBinNotification>
+public sealed class KeywordRegistryInvalidationHandler : INotificationHandler<ContentCacheRefresherNotification>
 {
     private readonly IKeywordRegistry _registry;
 
     public KeywordRegistryInvalidationHandler(IKeywordRegistry registry) => _registry = registry;
 
-    public void Handle(ContentPublishedNotification notification) => _registry.Invalidate();
-
-    public void Handle(ContentUnpublishedNotification notification) => _registry.Invalidate();
-
-    public void Handle(ContentDeletedNotification notification) => _registry.Invalidate();
-
-    public void Handle(ContentMovedNotification notification) => _registry.Invalidate();
-
-    public void Handle(ContentMovedToRecycleBinNotification notification) => _registry.Invalidate();
+    public void Handle(ContentCacheRefresherNotification notification) => _registry.Invalidate();
 }
