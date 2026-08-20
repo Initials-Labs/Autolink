@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "autolink",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "Autolink/Autolink.csproj", "--no-build", "--urls", "http://localhost:57401"],
+      "port": 57401
+    }
+  ]
+}

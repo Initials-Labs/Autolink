@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Autolink/Autolink.csproj" />
+  <Project Path="src/OC.AutoLink/OC.AutoLink.csproj" />
+</Solution>

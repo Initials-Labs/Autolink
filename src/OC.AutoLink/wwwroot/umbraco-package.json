@@ -1,0 +1,35 @@
+{
+  "$schema": "../../../Autolink/umbraco-package-schema.json",
+  "name": "OC.AutoLink",
+  "version": "0.1.0",
+  "allowTelemetry": false,
+  "extensions": [
+    {
+      "type": "section",
+      "alias": "OC.AutoLink.Section",
+      "name": "Auto-linking section",
+      "weight": 40,
+      "meta": {
+        "label": "Auto-linking",
+        "pathname": "auto-linking"
+      }
+    },
+    {
+      "type": "dashboard",
+      "alias": "OC.AutoLink.Dashboard.Keywords",
+      "name": "Auto-link keywords dashboard",
+      "element": "/App_Plugins/OC.AutoLink/autolink-keywords.js",
+      "weight": 10,
+      "meta": {
+        "label": "Keywords",
+        "pathname": "keywords"
+      },
+      "conditions": [
+        {
+          "alias": "Umb.Condition.SectionAlias",
+          "match": "OC.AutoLink.Section"
+        }
+      ]
+    }
+  ]
+}
