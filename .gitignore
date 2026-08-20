@@ -22,6 +22,9 @@ artifacts/
 ## Media uploaded or installed at runtime
 **/wwwroot/media/
 
+## Packaging output
+artifacts/
+
 ## Front end tooling, if it ever grows one
 node_modules/
 

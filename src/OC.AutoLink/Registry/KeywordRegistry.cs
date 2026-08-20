@@ -238,7 +238,7 @@ public sealed class KeywordRegistry : IKeywordRegistry
             frozenCandidates,
             conflicts,
             suppressions,
-            matchable.Count == 0 ? null : BuildMatcher(matchable));
+            matchable.Count == 0 ? null : KeywordMatcher.Build(matchable));
     }
 
     /// <summary>
@@ -428,34 +428,6 @@ public sealed class KeywordRegistry : IKeywordRegistry
     }
 
     private static bool IsRoutable(string? url) => !string.IsNullOrWhiteSpace(url) && url != "#";
-
-    /// <summary>
-    /// One compiled alternation for the whole keyword set. Sorted longest first so that where two keywords
-    /// start at the same position the more specific one wins.
-    /// </summary>
-    private static Regex BuildMatcher(IEnumerable<string> keywords)
-    {
-        string pattern = string.Join(
-            '|',
-            keywords
-                .OrderByDescending(k => k.Length)
-                .ThenBy(k => k, StringComparer.Ordinal)
-                .Select(ToBoundedPattern));
-
-        return new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.CultureInvariant);
-    }
-
-    /// <summary>
-    /// Word boundaries are applied per keyword rather than around the whole alternation, because \b only does
-    /// the right thing next to a word character. Wrapping the group would stop "C#" ever matching.
-    /// </summary>
-    private static string ToBoundedPattern(string keyword)
-    {
-        string escaped = Regex.Escape(keyword);
-        string left = char.IsLetterOrDigit(keyword[0]) ? @"\b" : string.Empty;
-        string right = char.IsLetterOrDigit(keyword[^1]) ? @"\b" : string.Empty;
-        return $"{left}{escaped}{right}";
-    }
 
     /// <summary>
     /// Hashes every culture's resolved targets, candidates and suppressions together. Changes only when the

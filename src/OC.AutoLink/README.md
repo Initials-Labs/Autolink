@@ -663,6 +663,46 @@ GET /autolink-demo/map?keyword=a&nodeId=1&culture=en-US    decisions take an opt
 
 ---
 
+## Production readiness
+
+Fixed, with the reasoning worth keeping:
+
+- **Invalidation hooks the cache refresher, not ContentPublished.** `ContentPublishedNotification` fires inside the
+  publish, before the published cache settles, so a render at that moment could rebuild from stale content and mark
+  itself clean — stale until the next content change. It also only fired on the publishing node.
+  `ContentCacheRefresherNotification` fires after the cache updates and on every node, so one hook replaced five and
+  fixed cross-node invalidation at the same time.
+- **Decision writes go through the distributed cache.** The mapping and suppression tables are ours, so no Umbraco
+  refresher carries them: a decision saved on one node left every other node serving old links. There is now a
+  registered `ICacheRefresher` and writes call `DistributedCache.RefreshAll`.
+- **Migrations use `AsyncMigrationBase`.** `MigrationBase` is obsolete and scheduled for removal in Umbraco 18.
+- **AngleSharp 1.7.1**, clearing GHSA-pgww-w46g-26qg. It runs on every page render, so an advisory there is not
+  something to carry.
+- **The schema installer is opt-in and nominates nothing.** `InstallSchema` defaults to false and
+  `InstallOnDocumentTypes` to empty. Guessing alias names was fine for a spike; a package editing document types at
+  every boot, on types nobody nominated, is not.
+- **41 tests**, covering what must not silently regress: word boundaries, longest-keyword-first, skipped elements,
+  never nesting an anchor, not rewriting attributes, the per-keyword cap, hand-link detection, self-linking, external
+  markup and rel, contested keywords reserving their span, culture fallback, decision precedence, and the narrowest
+  suppression row winning. Verified by mutation: breaking longest-first fails a test.
+- **Warnings are errors** in the package, and CI fails the build if the dashboard or the backoffice manifest stops
+  being packed.
+
+### Still outstanding
+
+| Item | Why it is not done |
+|---|---|
+| Localisation | Dashboard strings are hardcoded English. Needed before a public release, not before internal use. |
+| Consumer documentation | This README is a build log. A shipping package needs a shorter one aimed at somebody installing it. |
+| Licence | Deliberately unset in the csproj rather than assumed — the choice is the author's. |
+| Schema install as a migration | Still a startup fixup rather than a run-once migration, now that a plan exists to put it in. |
+| Delivery API | Delegated but not linked. Decide whether to support it or document it as out of scope. |
+| Accessibility | The keyword list is a CSS grid, not table semantics, and the accordion needs keyboard support. |
+| Uninstall | Removing the package leaves its two tables behind. |
+| Segments | `VariationContext` carries a segment as well as a culture; only culture is used. |
+
+---
+
 ## Deliberately not built
 
 Relations audit trail (the dry-run scan answers the same question without storage, but not historically),

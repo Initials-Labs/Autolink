@@ -1,0 +1,43 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore Autolink.slnx
+
+      # The package treats warnings as errors, so this fails on a new warning rather than letting one ship.
+      - name: Build
+        run: dotnet build Autolink.slnx --no-restore -c Release
+
+      - name: Test
+        run: dotnet test tests/OC.AutoLink.Tests/OC.AutoLink.Tests.csproj --no-build -c Release --logger "console;verbosity=normal"
+
+      - name: Pack
+        run: dotnet pack src/OC.AutoLink/OC.AutoLink.csproj --no-build -c Release -o artifacts
+
+      # Guards the two things that silently break a package: the dashboard not shipping, and a stray dependency.
+      - name: Check the package contents
+        run: |
+          unzip -l artifacts/*.nupkg
+          unzip -l artifacts/*.nupkg | grep -q 'staticwebassets/umbraco-package.json' || { echo 'The backoffice manifest is missing from the package'; exit 1; }
+          unzip -l artifacts/*.nupkg | grep -q 'staticwebassets/autolink-keywords.js' || { echo 'The dashboard is missing from the package'; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nupkg
+          path: artifacts/*.nupkg
