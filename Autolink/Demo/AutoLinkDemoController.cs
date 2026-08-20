@@ -177,7 +177,7 @@ public sealed class AutoLinkDemoController : ControllerBase
         var perCulture = cultures.Select(culture => new
         {
             Culture = culture,
-            TagsInStore = _tagQuery.GetAllContentTags(group, culture).Select(t => t.Text).ToList(),
+            TagsInStore = (_tagQuery.GetAllContentTags(group, culture) ?? []).OfType<ITag>().Select(t => t.Text).ToList(),
             FromQuery = _tagQuery.GetContentByTagGroup(group, culture)
                 .Select(content => new
                 {
@@ -192,7 +192,7 @@ public sealed class AutoLinkDemoController : ControllerBase
         // No culture argument at all: what the registry does today.
         var invariant = new
         {
-            TagsInStore = _tagQuery.GetAllContentTags(group).Select(t => t.Text).ToList(),
+            TagsInStore = (_tagQuery.GetAllContentTags(group) ?? []).OfType<ITag>().Select(t => t.Text).ToList(),
             FromQuery = _tagQuery.GetContentByTagGroup(group).Select(c => c.Name).ToList(),
         };
 
@@ -422,7 +422,8 @@ public sealed class AutoLinkDemoController : ControllerBase
             })
             .ToList();
 
-        var allTags = _tagQuery.GetAllContentTags(group)
+        var allTags = (_tagQuery.GetAllContentTags(group) ?? [])
+            .OfType<ITag>()
             .Select(tag => new { tag.Text, tag.Group, tag.NodeCount })
             .ToList();
 
@@ -547,9 +548,12 @@ public sealed class AutoLinkDemoController : ControllerBase
             return NotFound($"No content with id {nodeId}.");
         }
 
-        // IContentPublishingService.UnpublishAsync wants an explicit culture set, which an invariant site
-        // has nothing sensible to put in. IContentService.Unpublish handles invariant directly.
+        // IContentPublishingService.UnpublishAsync takes a culture set, and getting that wrong means content
+        // quietly staying published in one language. Not a risk worth taking in a dev harness, so the int overload
+        // stays and the obsolete constant is silenced deliberately rather than left as noise.
+#pragma warning disable CS0618 // SuperUserId is obsolete in favour of SuperUserKey, which the int overload cannot take
         PublishResult result = _contentService.Unpublish(content, userId: Constants.Security.SuperUserId);
+#pragma warning restore CS0618
 
         return Ok(new
         {
