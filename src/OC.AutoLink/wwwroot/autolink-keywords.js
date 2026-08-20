@@ -389,18 +389,14 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 				${when(this._adding, () => this.#renderAddForm())}
 
 				<p class="totals">
-					${rows.length === 1
-						? this.localize.term('ocAutoLink_keywordCountOne', rows.length)
-						: this.localize.term('ocAutoLink_keywordCountMany', rows.length)}
+					${this.localize.term('ocAutoLink_keywordCount', rows.length)}
 					${when(
 						selected?.conflicts,
 						() => html`&middot;
 							<span class="bad">${selected.conflicts} ${this.localize.term('ocAutoLink_needingDecision')}</span>`,
 					)}
 					&middot;
-					${linkedPages.size === 1
-						? this.localize.term('ocAutoLink_linkingOnPagesOne', linkedPages.size)
-						: this.localize.term('ocAutoLink_linkingOnPagesMany', linkedPages.size)}
+					${this.localize.term('ocAutoLink_linkingOnPages', linkedPages.size)}
 					&middot;
 					<span class="muted">${this.localize.term('ocAutoLink_pagesChecked', this._report?.pagesScanned ?? 0)}</span>
 				</p>
@@ -574,9 +570,7 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 				${mentions.length === 0
 					? html`<p class="muted">${this.localize.term('ocAutoLink_noMentions')}</p>`
 					: html`<div class="caption">
-								${this.#byPage(mentions).length === 1
-									? this.localize.term('ocAutoLink_mentionedOnOne', this.#byPage(mentions).length)
-									: this.localize.term('ocAutoLink_mentionedOnMany', this.#byPage(mentions).length)}
+								${this.localize.term('ocAutoLink_mentionedOn', this.#byPage(mentions).length)}
 							</div>
 							<div class="mentions">
 								${repeat(
@@ -626,9 +620,7 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 
 		if (row.source === 'external') {
 			return html`<p class="chosen">
-				${row.mappingCulture
-					? this.localize.term('ocAutoLink_externalForCulture', row.mappingCulture)
-					: this.localize.term('ocAutoLink_externalForAll')}
+				${this.localize.term('ocAutoLink_externalFor', row.mappingCulture)}
 				<uui-button
 					look="secondary"
 					color="danger"
@@ -642,11 +634,9 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 			const tagged = row.candidates.length > 0;
 
 			return html`<p class="chosen">
-				${!tagged && row.mappingCulture
-					? this.localize.term('ocAutoLink_chosenNoTag', row.mappingCulture)
-					: row.mappingCulture
-						? this.localize.term('ocAutoLink_chosenForCulture', row.mappingCulture)
-						: this.localize.term('ocAutoLink_chosenForAll')}
+				${tagged
+					? this.localize.term('ocAutoLink_chosenFor', row.mappingCulture)
+					: this.localize.term('ocAutoLink_chosenNoTag', row.mappingCulture)}
 				<uui-button
 					look="secondary"
 					label=${this.localize.term('ocAutoLink_undoChoice')}
@@ -699,11 +689,7 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 								@click=${() => this.#unlink(row.keyword, page.pageKey, page.name)}></uui-button>`
 					: state === 'off'
 						? html`<span class="warn">
-									${offEverywhere
-										? this.localize.term('ocAutoLink_switchedOffEverywhere')
-										: this.localize.term('ocAutoLink_switchedOffHere')}${offAllLanguages
-										? this.localize.term('ocAutoLink_allLanguagesSuffix')
-										: ''}
+									${this.localize.term('ocAutoLink_switchedOff', offEverywhere, offAllLanguages)}
 								</span>
 								<uui-button
 									look="secondary"

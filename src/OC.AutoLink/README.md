@@ -723,12 +723,21 @@ None of it has been through an actual screen reader. Sound structure, unverified
 
 ### Localisation
 
-Every string the screen shows lives in `wwwroot/lang/en-gb.js`, registered as a `localization` extension with
-`meta.culture: en-gb`. The element asks for terms through `this.localize.term('ocAutoLink_alias')`, and `%0%` tokens
-are filled in order, so nothing is assembled from sentence fragments in code. The section and dashboard names use the
-`#ocAutoLink_alias` convention in the manifest, the same way core does.
+Every string the screen shows lives in `wwwroot/lang/en.js`, and the element asks for terms through
+`this.localize.term('ocAutoLink_alias')`. Section and dashboard names use the `#ocAutoLink_alias` convention in the
+manifest, the same way core does.
 
 To add a language: copy the file, translate the values, and register it with its own culture. Nothing else changes.
+
+Two things caught me out, both worth knowing before writing one of these:
+
+- **A term that takes values is a function, not a token string.** `%0%` substitution is the pre-v14 convention and
+  renders literally now. Terms are `(count) => count === 1 ? '1 keyword' : \`${count} keywords\``, which is also why
+  pluralisation belongs in the language file rather than being assembled from fragments in the element.
+- **There is no fallback from a specific culture to its base.** A dictionary registered only for `en-gb` never loads
+  for a backoffice user set to English (United States), and nothing errors — the terms simply do not resolve. Core
+  ships both `en.js` and `en-us.js` for this reason. This one is registered for `en`, `en-gb` and `en-us`, all
+  pointing at the same file.
 
 The skip reasons were rewritten while doing this. They used to trail off from whatever preceded them — "also
 mentioned here, sits in a heading or an existing link" left the reader working out what *sits* anywhere. Each one now
