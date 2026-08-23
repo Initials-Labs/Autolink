@@ -1,5 +1,4 @@
 using System.Text.RegularExpressions;
-using OC.AutoLink.Models;
 
 namespace OC.AutoLink.Registry;
 
@@ -9,6 +8,10 @@ namespace OC.AutoLink.Registry;
 /// <remarks>
 /// Its own type so the two rules that matter can be tested directly rather than inferred from rendered HTML:
 /// longest keyword first, and word boundaries applied per keyword.
+/// <para>
+/// The registry and the tests both come through here, so what ships and what is tested cannot disagree about
+/// which keywords are matchable.
+/// </para>
 /// </remarks>
 public static class KeywordMatcher
 {
@@ -16,23 +19,18 @@ public static class KeywordMatcher
     /// The matcher for one culture's keyword set, or null when there is nothing to match.
     /// </summary>
     /// <remarks>
-    /// Contested keywords are matched even though they resolve to nothing, so they still claim their span.
-    /// <c>Regex.Matches</c> is non-overlapping and the alternation is longest first, so a shorter keyword cannot
-    /// match inside a contested phrase. Without this, dropping "content editor" for being contested lets "editor"
-    /// link the same words to a third page that was never a candidate.
+    /// Every keyword with a destination is matched, including ones held back by a suppression: they resolve, so they
+    /// are in here, and the suppression is applied after the match. That is what stops switching a keyword off from
+    /// promoting a shorter overlapping one — <c>Regex.Matches</c> is non-overlapping and the alternation is longest
+    /// first, so nothing can match inside a phrase that already claimed its span.
     /// <para>
-    /// The registry and the tests both come through here, so what ships and what is tested cannot disagree about
-    /// which keywords are matchable.
+    /// A keyword whose destination will not resolve is absent, and does not reserve anything. It is a mapping to
+    /// repair rather than a decision to hold ground for.
     /// </para>
     /// </remarks>
-    public static Regex? For(IEnumerable<string> resolved, IEnumerable<KeywordConflict> conflicts)
+    public static Regex? For(IEnumerable<string> keywords)
     {
-        var matchable = new HashSet<string>(resolved, StringComparer.OrdinalIgnoreCase);
-
-        foreach (KeywordConflict conflict in conflicts)
-        {
-            matchable.Add(conflict.Keyword);
-        }
+        var matchable = new HashSet<string>(keywords, StringComparer.OrdinalIgnoreCase);
 
         return matchable.Count == 0 ? null : Build(matchable);
     }

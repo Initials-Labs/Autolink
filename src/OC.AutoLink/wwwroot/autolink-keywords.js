@@ -4,25 +4,32 @@ import { UMB_AUTH_CONTEXT } from '@umbraco-cms/backoffice/auth';
 import { UMB_NOTIFICATION_CONTEXT } from '@umbraco-cms/backoffice/notification';
 import '@umbraco-cms/backoffice/external/uui';
 
+// Umbraco's own Multi URL Picker input, the one behind the Umbraco.MultiUrlPicker property editor. Importing it
+// defines <umb-input-multi-url>, and with it the link picker modal that already knows how to offer a page or a
+// typed URL. Rebuilding either of those here would mean a picker that behaves almost like the one editors know.
+import '@umbraco-cms/backoffice/multi-url-picker';
+
 const API = '/umbraco/management/api/v1/autolink';
 const EVERYWHERE = '00000000-0000-0000-0000-000000000000';
 
-/** Skip codes from the server to localisation keys. The wording lives in lang/en-gb.js. */
+/** Skip codes from the server to localisation keys. The wording lives in lang/en.js. */
 const REASON_KEYS = {
 	self: 'ocAutoLink_reasonSelf',
 	'hand-linked': 'ocAutoLink_reasonHandLinked',
 	'skipped-element': 'ocAutoLink_reasonSkippedElement',
 	limit: 'ocAutoLink_reasonLimit',
-	contested: 'ocAutoLink_reasonContested',
 };
 
 /**
  * One row per keyword, detail on demand.
  *
- * Everything here was already on screen before and it was unreadable: every keyword fully expanded, and the
- * destination printed twice because "links to" and "tagged on" are the same page whenever nothing is contested. So
- * the row carries the summary, aligned in columns so it can be scanned down, and the detail opens underneath. Rows
- * needing a decision sort first and open themselves, because they are the only ones anybody has to act on.
+ * This screen owns the keywords outright. There is no property on any document type to fill in and no tag to
+ * apply: a keyword exists because somebody added it here, and it points wherever they pointed it. Which is why
+ * the destination is Umbraco's Multi URL Picker rather than a URL box — a page and an outside URL are the same
+ * decision, and the picker is where an editor already expects to make it.
+ *
+ * Rows are summaries, aligned in columns so they can be scanned down, with detail underneath. Rows needing
+ * attention sort first and open themselves, because they are the only ones anybody has to act on.
  */
 export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 	static properties = {
@@ -34,10 +41,12 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 		_error: { state: true },
 		_busy: { state: true },
 		_adding: { state: true },
-		_newKeyword: { state: true },
-		_newUrl: { state: true },
-		_newLabel: { state: true },
-		_newNofollow: { state: true },
+		_editing: { state: true },
+		_formKeyword: { state: true },
+		_formLink: { state: true },
+		_formLabel: { state: true },
+		_formNofollow: { state: true },
+		_formTargetNoticed: { state: true },
 	};
 
 	#notifications;
@@ -52,11 +61,7 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 		this._loading = true;
 		this._error = null;
 		this._busy = null;
-		this._adding = false;
-		this._newKeyword = '';
-		this._newUrl = '';
-		this._newLabel = '';
-		this._newNofollow = true;
+		this.#resetForm();
 
 		this.consumeContext(UMB_NOTIFICATION_CONTEXT, (context) => {
 			this.#notifications = context;
@@ -100,6 +105,15 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 			};
 		}
 
+		// A rejected save says why in the body. Worth showing: every validation rule on the way in is a sentence
+		// somebody needs to read, and "the request failed (400)" is not that sentence.
+		if (response.status === 400) {
+			const reason = await response.text().catch(() => '');
+			if (reason) {
+				return { data: null, error: reason };
+			}
+		}
+
 		return { data: null, error: this.localize.term('ocAutoLink_requestFailed', response.status) };
 	}
 
@@ -125,14 +139,15 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 
 		const cultures = keywords.data.cultures ?? [];
 		if (!cultures.some((c) => c.culture === this._culture)) {
-			const interesting = cultures.find((c) => c.conflicts > 0) ?? cultures.find((c) => c.total > 0) ?? cultures[0];
+			const interesting =
+				cultures.find((c) => c.unresolved > 0) ?? cultures.find((c) => c.total > 0) ?? cultures[0];
 			this._culture = interesting?.culture ?? '';
 		}
 
-		// Anything needing a decision opens itself; there is nothing to think about on the rest.
+		// Anything broken opens itself; there is nothing to think about on the rest.
 		const expanded = new Set(this._expanded);
 		for (const row of this.#rows()) {
-			if (row.hasConflict) expanded.add(row.keyword);
+			if (row.source === 'unresolved') expanded.add(row.keyword);
 		}
 
 		this._expanded = expanded;
@@ -144,7 +159,24 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 	}
 
 	#languageLabel(culture) {
-		return culture.length === 0 ? this.localize.term('ocAutoLink_allLanguages') : culture;
+		return !culture || culture.length === 0
+			? this.localize.term('ocAutoLink_allLanguages')
+			: this.#displayCulture(culture);
+	}
+
+	/**
+	 * A culture code as the registry spells it.
+	 *
+	 * Stored rows carry a lower-cased culture, because it is an index key compared case-insensitively — so the row
+	 * for en-GB comes back from the API as "en-gb". Showing that verbatim in a sentence reads as a bug. The
+	 * registry's own list is the display spelling.
+	 */
+	#displayCulture(culture) {
+		const known = (this._overview?.cultures ?? []).find(
+			(entry) => entry.culture.toLowerCase() === culture.toLowerCase(),
+		);
+
+		return known?.culture ?? culture;
 	}
 
 	/** Keyword rows for the language being viewed, the ones needing attention first. */
@@ -153,7 +185,9 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 		const mentions = this.#mentions();
 
 		return rows.sort((a, b) => {
-			if (a.hasConflict !== b.hasConflict) return a.hasConflict ? -1 : 1;
+			const aBroken = a.source === 'unresolved';
+			const bBroken = b.source === 'unresolved';
+			if (aBroken !== bBroken) return aBroken ? -1 : 1;
 
 			const aCount = (mentions.get(a.keyword.toLowerCase()) ?? []).length;
 			const bCount = (mentions.get(b.keyword.toLowerCase()) ?? []).length;
@@ -235,59 +269,132 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 
 		if (error) {
 			this.#notify('danger', error);
-			return;
+			return false;
 		}
 
 		this.#notify('positive', message);
 		await this.#load();
+		return true;
 	}
 
-	#use(keyword, targetKey, targetName) {
-		return this.#act(
-			`use|${keyword}|${targetKey}`,
-			'PUT',
-			'/mapping',
-			{ keyword, targetKey, culture: this._culture ?? '' },
-			this.localize.term('ocAutoLink_nowLinksTo', keyword, targetName),
-		);
+	// ---------------------------------------------------------------------------------------------------------
+	// The form: one shape for adding a keyword and for changing where an existing one points.
+	// ---------------------------------------------------------------------------------------------------------
+
+	#resetForm() {
+		this._adding = false;
+		this._editing = null;
+		this._formKeyword = '';
+		this._formLink = null;
+		this._formLabel = '';
+		this._formNofollow = true;
+		this._formTargetNoticed = false;
 	}
 
-	async #addExternal() {
-		const keyword = this._newKeyword.trim();
-		const url = this._newUrl.trim();
+	#formOpen() {
+		return this._adding || this._editing !== null;
+	}
 
-		if (!keyword || !url) {
-			this.#notify('danger', this.localize.term('ocAutoLink_addNeedsBoth'));
+	#openAdd() {
+		this.#resetForm();
+		this._adding = true;
+	}
+
+	#openEdit(row) {
+		this.#resetForm();
+		this._editing = row.keyword;
+		this._formKeyword = row.keyword;
+		this._formLabel = row.label ?? '';
+		this._formNofollow = row.nofollow ?? true;
+		this._formLink = row.externalUrl
+			? { type: 'external', url: row.externalUrl, name: row.label ?? '' }
+			: row.targetKey
+				? { type: 'document', unique: row.targetKey, name: row.targetName ?? '', url: row.url ?? '' }
+				: null;
+	}
+
+	/**
+	 * What the picker handed back, if this package can store it.
+	 *
+	 * A media pick is turned away rather than quietly stored. Media resolves to a site-relative URL, and the
+	 * validation on an external destination insists on an absolute http or https one on purpose — it is the only
+	 * editor-typed string that reaches an href. Loosening it for a keyword pointing at a PDF is not a trade worth
+	 * making here.
+	 */
+	#onLinkChange(event) {
+		const link = event.target.urls?.[0] ?? null;
+
+		if (link?.type === 'media') {
+			event.target.urls = [];
+			this._formLink = null;
+			this._formTargetNoticed = false;
+			this.#notify('warning', this.localize.term('ocAutoLink_mediaNotSupported'));
 			return;
 		}
 
-		await this.#act(
-			`add|${keyword}`,
-			'PUT',
-			'/mapping',
-			{
-				keyword,
-				externalUrl: url,
-				label: this._newLabel.trim() || null,
-				nofollow: this._newNofollow,
-				culture: this._culture ?? '',
-			},
-			this.localize.term('ocAutoLink_nowLinksTo', keyword, url),
-		);
+		this._formLink = link;
 
-		this._adding = false;
-		this._newKeyword = '';
-		this._newUrl = '';
-		this._newLabel = '';
+		// Nothing in an auto-link opens a new window, and the picker's checkbox cannot be hidden. Say so rather
+		// than dropping it silently.
+		this._formTargetNoticed = Boolean(link?.target);
 	}
 
-	#clearChoice(keyword, mappingCulture) {
+	#linkIsExternal(link) {
+		return Boolean(link) && !link.unique;
+	}
+
+	async #saveKeyword() {
+		const keyword = (this._editing ?? this._formKeyword).trim();
+		const link = this._formLink;
+
+		if (!keyword || !link) {
+			this.#notify('danger', this.localize.term('ocAutoLink_needsKeywordAndDestination'));
+			return;
+		}
+
+		const body = { keyword, culture: this._culture ?? '' };
+		let destination;
+
+		if (this.#linkIsExternal(link)) {
+			const url = (link.url ?? '').trim();
+			const lower = url.toLowerCase();
+
+			// Checked here as well as at the API, so a typo comes back as a sentence about the URL instead of a
+			// rejected request.
+			if (!lower.startsWith('http://') && !lower.startsWith('https://')) {
+				this.#notify('danger', this.localize.term('ocAutoLink_notAbsoluteUrl'));
+				return;
+			}
+
+			body.externalUrl = url;
+			body.label = this._formLabel.trim() || link.name || null;
+			body.nofollow = this._formNofollow;
+			destination = body.label || url;
+		} else {
+			body.targetKey = link.unique;
+			destination = link.name || this.localize.term('ocAutoLink_thePage');
+		}
+
+		const saved = await this.#act(
+			`save|${keyword}`,
+			'PUT',
+			'/mapping',
+			body,
+			this.localize.term('ocAutoLink_nowLinksTo', keyword, destination),
+		);
+
+		if (saved) {
+			this.#resetForm();
+		}
+	}
+
+	#removeKeyword(keyword, mappingCulture) {
 		return this.#act(
-			`clear|${keyword}`,
+			`remove|${keyword}`,
 			'DELETE',
 			`/mapping?keyword=${encodeURIComponent(keyword)}&culture=${encodeURIComponent(mappingCulture ?? '')}`,
 			null,
-			this.localize.term('ocAutoLink_backToAutomatic', keyword),
+			this.localize.term('ocAutoLink_keywordRemoved', keyword),
 		);
 	}
 
@@ -358,10 +465,10 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 				<div slot="header-actions">
 					<uui-button
 						look="secondary"
-						label=${this._adding ? this.localize.term('ocAutoLink_cancel') : this.localize.term('ocAutoLink_addExternal')}
-						@click=${() => {
-							this._adding = !this._adding;
-						}}></uui-button>
+						label=${this.#formOpen()
+							? this.localize.term('ocAutoLink_cancel')
+							: this.localize.term('ocAutoLink_addKeyword')}
+						@click=${() => (this.#formOpen() ? this.#resetForm() : this.#openAdd())}></uui-button>
 					<uui-button
 						look="secondary"
 						label=${this.localize.term('ocAutoLink_refresh')}
@@ -376,7 +483,7 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 							(entry) => entry.culture,
 							(entry) => html`<uui-button
 								look=${entry.culture === this._culture ? 'primary' : 'outline'}
-								color=${entry.conflicts > 0 ? 'danger' : 'default'}
+								color=${entry.unresolved > 0 ? 'danger' : 'default'}
 								aria-pressed=${entry.culture === this._culture ? 'true' : 'false'}
 								label="${this.#languageLabel(entry.culture)} (${entry.total})"
 								@click=${() => {
@@ -386,14 +493,14 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 					</div>`,
 				)}
 
-				${when(this._adding, () => this.#renderAddForm())}
+				${when(this.#formOpen(), () => this.#renderForm())}
 
 				<p class="totals">
 					${this.localize.term('ocAutoLink_keywordCount', rows.length)}
 					${when(
-						selected?.conflicts,
+						selected?.unresolved,
 						() => html`&middot;
-							<span class="bad">${selected.conflicts} ${this.localize.term('ocAutoLink_needingDecision')}</span>`,
+							<span class="bad">${this.localize.term('ocAutoLink_needingAttention', selected.unresolved)}</span>`,
 					)}
 					&middot;
 					${this.localize.term('ocAutoLink_linkingOnPages', linkedPages.size)}
@@ -404,58 +511,83 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 		`;
 	}
 
-	#renderAddForm() {
-		const busy = this._busy?.startsWith('add|');
+	#renderForm() {
+		const editing = this._editing !== null;
+		const busy = this._busy?.startsWith('save|');
+		const language = this.#languageLabel(this._culture ?? '');
+		const external = this.#linkIsExternal(this._formLink);
 
 		return html`
-			<div class="add">
-				<div class="add-head">
-					${this.localize.term('ocAutoLink_addHeading', this.#languageLabel(this._culture ?? ''))}
+			<div class="form">
+				<div class="form-head">
+					${editing
+						? this.localize.term('ocAutoLink_editHeading', this._editing, language)
+						: this.localize.term('ocAutoLink_addHeading', language)}
 				</div>
 
-				<div class="add-fields">
-					<uui-input
-						label=${this.localize.term('ocAutoLink_fieldKeyword')}
-						placeholder=${this.localize.term('ocAutoLink_fieldKeywordHint')}
-						.value=${this._newKeyword}
-						@input=${(event) => {
-							this._newKeyword = event.target.value ?? '';
-						}}></uui-input>
+				<div class="form-fields">
+					<div class="field">
+						<span class="field-label">${this.localize.term('ocAutoLink_fieldKeyword')}</span>
+						<uui-input
+							label=${this.localize.term('ocAutoLink_fieldKeyword')}
+							placeholder=${this.localize.term('ocAutoLink_fieldKeywordHint')}
+							?disabled=${editing}
+							.value=${this._formKeyword}
+							@input=${(event) => {
+								this._formKeyword = event.target.value ?? '';
+							}}></uui-input>
+					</div>
 
-					<uui-input
-						label=${this.localize.term('ocAutoLink_fieldUrl')}
-						placeholder=${this.localize.term('ocAutoLink_fieldUrlHint')}
-						.value=${this._newUrl}
-						@input=${(event) => {
-							this._newUrl = event.target.value ?? '';
-						}}></uui-input>
-
-					<uui-input
-						label=${this.localize.term('ocAutoLink_fieldTitle')}
-						placeholder=${this.localize.term('ocAutoLink_fieldTitleHint')}
-						.value=${this._newLabel}
-						@input=${(event) => {
-							this._newLabel = event.target.value ?? '';
-						}}></uui-input>
+					<div class="field">
+						<span class="field-label">${this.localize.term('ocAutoLink_fieldDestination')}</span>
+						<umb-input-multi-url
+							max="1"
+							hide-anchor
+							.urls=${this._formLink ? [this._formLink] : []}
+							@change=${(event) => this.#onLinkChange(event)}></umb-input-multi-url>
+					</div>
 				</div>
 
-				<label class="add-follow">
-					<input
-						type="checkbox"
-						.checked=${this._newNofollow}
-						@change=${(event) => {
-							this._newNofollow = event.target.checked;
-						}} />
-					${this.localize.term('ocAutoLink_nofollowLabel')}
-				</label>
+				${when(
+					external,
+					() => html`
+						<div class="form-fields">
+							<div class="field">
+								<span class="field-label">${this.localize.term('ocAutoLink_fieldTitle')}</span>
+								<uui-input
+									label=${this.localize.term('ocAutoLink_fieldTitle')}
+									placeholder=${this.localize.term('ocAutoLink_fieldTitleHint')}
+									.value=${this._formLabel}
+									@input=${(event) => {
+										this._formLabel = event.target.value ?? '';
+									}}></uui-input>
+							</div>
+						</div>
+
+						<label class="form-follow">
+							<input
+								type="checkbox"
+								.checked=${this._formNofollow}
+								@change=${(event) => {
+									this._formNofollow = event.target.checked;
+								}} />
+							${this.localize.term('ocAutoLink_nofollowLabel')}
+						</label>
+					`,
+				)}
+
+				${when(
+					this._formTargetNoticed,
+					() => html`<p class="muted">${this.localize.term('ocAutoLink_targetNotUsed')}</p>`,
+				)}
 
 				<div>
 					<uui-button
 						look="primary"
 						color="positive"
-						label=${this.localize.term('ocAutoLink_addLink')}
+						label=${this.localize.term('ocAutoLink_saveKeyword')}
 						?disabled=${busy}
-						@click=${() => this.#addExternal()}></uui-button>
+						@click=${() => this.#saveKeyword()}></uui-button>
 				</div>
 			</div>
 		`;
@@ -467,6 +599,11 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 		if (rows.length === 0) {
 			return html`<uui-box>
 				<p>${this.localize.term('ocAutoLink_noKeywords', this.#languageLabel(this._culture ?? ''))}</p>
+				<uui-button
+					look="primary"
+					color="positive"
+					label=${this.localize.term('ocAutoLink_addKeyword')}
+					@click=${() => this.#openAdd()}></uui-button>
 			</uui-box>`;
 		}
 
@@ -497,6 +634,8 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 
 	#renderRow(row, mentions) {
 		const open = this._expanded.has(row.keyword);
+		const broken = row.source === 'unresolved';
+
 		// Counted per page, not per mention, so these agree with the list that opens underneath.
 		const pages = this.#byPage(mentions).map((group) => this.#state(this.#primary(group.placements)));
 		const counts = {
@@ -509,7 +648,7 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 		const panelId = this.#panelId(row.keyword);
 
 		return html`
-			<div class="row ${row.hasConflict ? 'attention' : ''} ${open ? 'open' : ''}" role="listitem">
+			<div class="row ${broken ? 'attention' : ''} ${open ? 'open' : ''}" role="listitem">
 				<button
 					class="caret"
 					aria-expanded=${open ? 'true' : 'false'}
@@ -524,20 +663,15 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 				<span class="keyword">${row.keyword}</span>
 
 				<span class="destination">
-					${row.hasConflict
-						? html`<span class="bad">${this.localize.term('ocAutoLink_contestedSummary')}</span>`
+					${broken
+						? html`<span class="bad">${this.localize.term('ocAutoLink_unresolvedSummary')}</span>
+								${when(row.externalUrl, () => html`<span class="path">${row.externalUrl}</span>`)}`
 						: row.source === 'external'
 							? html`<a href=${row.url} target="_blank" rel="noopener noreferrer">${row.targetName}</a>
 									<span class="path">${row.url}</span>
 									<span class="pill">${this.localize.term('ocAutoLink_external')} <span aria-hidden="true">&#8599;</span></span>`
-							: row.url
-								? html`<a href=${row.url} target="_blank" rel="noopener">${row.targetName}</a>
-										<span class="path">${row.url}</span>
-										${when(
-											row.source === 'manual',
-											() => html`<span class="muted">${this.localize.term('ocAutoLink_chosenByHand')}</span>`,
-										)}`
-								: html`<span class="muted">${this.localize.term('ocAutoLink_nothingYet')}</span>`}
+							: html`<a href=${row.url} target="_blank" rel="noopener">${row.targetName}</a>
+									<span class="path">${row.url}</span>`}
 				</span>
 
 				<span class="counts">
@@ -569,7 +703,7 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 				id=${panelId}
 				role="region"
 				aria-label=${this.localize.term('ocAutoLink_detailFor', row.keyword)}>
-				${this.#renderChoice(row)}
+				${this.#renderDestination(row)}
 				${mentions.length === 0
 					? html`<p class="muted">${this.localize.term('ocAutoLink_noMentions')}</p>`
 					: html`<div class="caption">
@@ -584,71 +718,57 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 							</div>
 							${when(
 								mentions.some((m) => this.#state(m.placement) === 'linked'),
-								() => html`<uui-button
-									look="secondary"
-									color="danger"
-									label=${this.localize.term('ocAutoLink_neverLink')}
-									?disabled=${this._busy === `off|${row.keyword}|${EVERYWHERE}`}
-									@click=${() => this.#unlink(row.keyword, EVERYWHERE, 'any page')}></uui-button>`,
+								() => html`<div class="detail-actions">
+									<uui-button
+										look="secondary"
+										color="danger"
+										label=${this.localize.term('ocAutoLink_neverLink')}
+										?disabled=${this._busy === `off|${row.keyword}|${EVERYWHERE}`}
+										@click=${() => this.#unlink(row.keyword, EVERYWHERE, 'any page')}></uui-button>
+								</div>`,
 							)}`}
 			</div>
 		`;
 	}
 
-	/** The destination half: only worth its own block when there is a decision to make or undo. */
-	#renderChoice(row) {
-		const busy = this._busy?.startsWith(`use|${row.keyword}`) || this._busy === `clear|${row.keyword}`;
+	/** Where this keyword goes, and the two things you can do about it. */
+	#renderDestination(row) {
+		const busy = this._busy === `remove|${row.keyword}` || this._busy?.startsWith(`save|${row.keyword}`);
+		const broken = row.source === 'unresolved';
 
-		if (row.hasConflict) {
-			return html`
-				<div class="choice">
-					<div class="choice-head">${this.localize.term('ocAutoLink_chooseHeading')}</div>
-					${repeat(
-						row.candidates,
-						(candidate) => candidate.targetKey,
-						(candidate) => html`<div class="option">
-							<uui-button
-								look="secondary"
-								label=${this.localize.term('ocAutoLink_useThis')}
-								?disabled=${busy}
-								@click=${() => this.#use(row.keyword, candidate.targetKey, candidate.targetName)}></uui-button>
-							<a href=${candidate.url} target="_blank" rel="noopener">${candidate.targetName}</a>
-							<span class="path">${candidate.url}</span>
-						</div>`,
-					)}
-					<p class="muted">${this.localize.term('ocAutoLink_untagInstead')}</p>
-				</div>
-			`;
-		}
+		return html`
+			<div class="destination-block ${broken ? 'broken' : ''}">
+				${when(
+					broken,
+					() => html`<p class="bad">
+						${row.externalUrl
+							? this.localize.term('ocAutoLink_unresolvedExternalDetail')
+							: this.localize.term('ocAutoLink_unresolvedPageDetail')}
+					</p>`,
+				)}
 
-		if (row.source === 'external') {
-			return html`<p class="chosen">
-				${this.localize.term('ocAutoLink_externalFor', this.#languageLabel(row.mappingCulture ?? ''))}
-				<uui-button
-					look="secondary"
-					color="danger"
-					label=${this.localize.term('ocAutoLink_removeLink')}
-					?disabled=${busy}
-					@click=${() => this.#clearChoice(row.keyword, row.mappingCulture)}></uui-button>
-			</p>`;
-		}
-
-		if (row.source === 'manual') {
-			const tagged = row.candidates.length > 0;
-
-			return html`<p class="chosen">
-				${tagged
-					? this.localize.term('ocAutoLink_chosenFor', this.#languageLabel(row.mappingCulture ?? ''))
-					: this.localize.term('ocAutoLink_chosenNoTag', this.#languageLabel(row.mappingCulture ?? ''))}
-				<uui-button
-					look="secondary"
-					label=${this.localize.term('ocAutoLink_undoChoice')}
-					?disabled=${busy}
-					@click=${() => this.#clearChoice(row.keyword, row.mappingCulture)}></uui-button>
-			</p>`;
-		}
-
-		return nothing;
+				<p class="chosen">
+					<span class="muted">
+						${this.localize.term(
+							'ocAutoLink_setFor',
+							this.#languageLabel(row.mappingCulture ?? ''),
+							row.updatedBy ?? this.localize.term('ocAutoLink_somebody'),
+						)}
+					</span>
+					<uui-button
+						look="secondary"
+						label=${this.localize.term('ocAutoLink_changeDestination')}
+						?disabled=${busy}
+						@click=${() => this.#openEdit(row)}></uui-button>
+					<uui-button
+						look="secondary"
+						color="danger"
+						label=${this.localize.term('ocAutoLink_removeKeyword')}
+						?disabled=${busy}
+						@click=${() => this.#removeKeyword(row.keyword, row.mappingCulture)}></uui-button>
+				</p>
+			</div>
+		`;
 	}
 
 	#renderPageGroup(row, { page, placements }) {
@@ -731,14 +851,16 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 		}
 
 		/* Head and rows share one explicit template, which is what lines the columns up. Deliberately not subgrid:
-		   fixed tracks align in every browser and this needs no cleverness. */
+		   fixed tracks align in every browser and this needs no cleverness.
+		   Proportional tracks rather than fixed ones, because a fixed destination column plus 1fr stranded the
+		   mentions count on its own at the far right of a wide screen. */
 		.head,
 		.row {
 			display: grid;
-			grid-template-columns: 2rem 12rem minmax(14rem, 1fr) 13rem;
+			grid-template-columns: 2rem minmax(9rem, 1fr) minmax(16rem, 2.4fr) minmax(9rem, 1fr);
 			column-gap: var(--uui-size-space-4);
 			align-items: baseline;
-			padding: var(--uui-size-space-3) 0;
+			padding: var(--uui-size-space-4) 0;
 			border-top: 1px solid var(--uui-color-divider);
 		}
 
@@ -748,6 +870,15 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 			font-size: var(--uui-type-small-size);
 			text-transform: uppercase;
 			letter-spacing: 0.04em;
+			padding-bottom: var(--uui-size-space-2);
+		}
+
+		/* The count column reads as a right-hand metric, the way a total does in any table. Left-aligned it just
+		   floats in the middle of nowhere. */
+		.head span:last-of-type,
+		.counts {
+			justify-content: flex-end;
+			text-align: right;
 		}
 
 		.row.attention {
@@ -789,7 +920,12 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 			display: flex;
 			flex-wrap: wrap;
 			gap: var(--uui-size-space-2);
-			align-items: baseline;
+			/* Centred, not baseline: the external pill has its own box and sits low against a text baseline. */
+			align-items: center;
+		}
+
+		.destination a {
+			font-weight: 600;
 		}
 
 		/* Detail spans every column, and hangs off a vertical rule under the keyword so it plainly belongs to the row
@@ -799,8 +935,10 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 			display: flex;
 			flex-direction: column;
 			gap: var(--uui-size-space-3);
-			margin: var(--uui-size-space-4) 0 0 0.6rem;
-			padding: 0 0 0 var(--uui-size-space-5);
+			/* 2rem is the caret track, so the rule sits under the caret and the detail's text starts on the same
+			   line as the keyword above it. It used to hang slightly left of the keyword, which read as a mistake. */
+			margin: var(--uui-size-space-4) 0 0 2rem;
+			padding: 0 0 0 var(--uui-size-space-4);
 			border-left: 2px solid color-mix(in srgb, var(--uui-color-interactive, #3544b1) 25%, transparent);
 		}
 
@@ -811,17 +949,18 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 			letter-spacing: 0.04em;
 		}
 
-		.choice {
-			display: flex;
-			flex-direction: column;
-			gap: var(--uui-size-space-2);
+		.destination-block.broken {
 			padding: var(--uui-size-space-3);
 			border-left: 3px solid var(--uui-color-danger);
 			background: var(--uui-color-surface);
 		}
 
-		.choice-head {
-			font-weight: bold;
+		.destination-block p {
+			margin: 0 0 var(--uui-size-space-2) 0;
+		}
+
+		.destination-block p:last-child {
+			margin-bottom: 0;
 		}
 
 		/* Fixed tracks, not max-content: every mention row must use the same columns or nothing lines up down the
@@ -835,11 +974,24 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 			background: color-mix(in srgb, var(--uui-color-interactive, #3544b1) 10%, transparent);
 		}
 
+		/* Same reasoning as the keyword table: proportional tracks, and the action pinned right so the buttons form
+		   one column down the list instead of drifting with the length of each URL. */
 		.mention {
 			display: grid;
-			grid-template-columns: minmax(7rem, 14rem) minmax(6rem, 1fr) 12rem 12rem;
+			grid-template-columns: minmax(9rem, 1.5fr) minmax(8rem, 2fr) minmax(6rem, 1fr) 10rem;
 			column-gap: var(--uui-size-space-3);
-			align-items: baseline;
+			align-items: center;
+			min-height: var(--uui-size-10, 2.5rem);
+		}
+
+		.mention > :nth-child(4) {
+			justify-self: end;
+		}
+
+		/* A skip reason is a sentence, not a status word, so it gets the status and action columns to wrap in. */
+		.mention.skipped > .muted {
+			grid-column: 3 / -1;
+			text-align: right;
 		}
 
 		/* Indented under the page it belongs to, and quiet: these are footnotes about one page, not findings. */
@@ -848,15 +1000,6 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 			color: var(--uui-color-text-alt);
 			font-size: var(--uui-type-small-size);
 			font-style: italic;
-		}
-
-		.option {
-			display: grid;
-			grid-template-columns: 7rem minmax(7rem, 14rem) minmax(6rem, 1fr);
-			column-gap: var(--uui-size-space-3);
-			align-items: baseline;
-			padding: var(--uui-size-space-2) 0;
-			border-top: 1px solid var(--uui-color-divider);
 		}
 
 		.mentions {
@@ -869,8 +1012,7 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 			border-top: 1px solid var(--uui-color-divider);
 		}
 
-		.mentions .group:first-child,
-		.choice .option:first-child {
+		.mentions .group:first-child {
 			border-top: none;
 		}
 
@@ -879,7 +1021,7 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 			text-decoration: line-through;
 		}
 
-		.add {
+		.form {
 			display: flex;
 			flex-direction: column;
 			gap: var(--uui-size-space-3);
@@ -889,17 +1031,44 @@ export default class OcAutoLinkKeywordsElement extends UmbLitElement {
 			background: var(--uui-color-surface-alt, rgba(0, 0, 0, 0.03));
 		}
 
-		.add-head {
+		.form-head {
 			font-weight: bold;
 		}
 
-		.add-fields {
+		.form-fields {
 			display: grid;
-			grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-			gap: var(--uui-size-space-3);
+			grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+			gap: var(--uui-size-space-4);
+			align-items: start;
 		}
 
-		.add-follow {
+		/* Every field is a label stacked over its control. The picker is a stack of its own — a ref-node once
+		   something is chosen, a full-width placeholder button before that — and it only lines up with the keyword
+		   box if that one carries a label of the same height rather than relying on its placeholder. */
+		.field {
+			display: flex;
+			flex-direction: column;
+			gap: var(--uui-size-space-1);
+		}
+
+		.field uui-input {
+			width: 100%;
+		}
+
+		.field-label {
+			color: var(--uui-color-text-alt);
+			font-size: var(--uui-type-small-size);
+			font-weight: 600;
+		}
+
+		/* Left, with the fields, rather than stretched across the form by the parent's flex stretch. */
+		.detail-actions,
+		.form > div:last-child {
+			display: flex;
+			justify-content: flex-start;
+		}
+
+		.form-follow {
 			display: flex;
 			align-items: center;
 			gap: var(--uui-size-space-2);

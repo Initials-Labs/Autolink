@@ -181,7 +181,6 @@ public class AutoLinkerTests
     {
         CultureKeywordSet set = TestLinker.Set(
             [TestLinker.Page("Umbraco")],
-            [],
             [TestLinker.Suppression("Umbraco", TestLinker.PageKey, culture: "en-GB")]);
 
         IReadOnlyList<AutoLinkPlacement> placements = TestLinker.Create(set).Preview(
@@ -194,14 +193,13 @@ public class AutoLinkerTests
     }
 
     [Fact]
-    public void A_contested_keyword_reserves_its_span_so_a_shorter_one_cannot_take_it()
+    public void A_suppressed_keyword_reserves_its_span_so_a_shorter_one_cannot_take_it()
     {
-        // "content editor" is contested, so it resolves to nothing; "editor" resolves to a page. The phrase must
-        // stay plain rather than being handed to the shorter keyword.
+        // "content editor" is switched off everywhere; "editor" resolves to a page. Switching a keyword off must
+        // not promote a shorter keyword onto the same words, so the phrase stays plain.
         CultureKeywordSet set = TestLinker.Set(
-            [TestLinker.Page("editor", "/about/")],
-            [new KeywordConflict("content editor", [])],
-            []);
+            [TestLinker.Page("content editor", "/roles/"), TestLinker.Page("editor", "/about/")],
+            [TestLinker.Suppression("content editor", Guid.Empty)]);
 
         string result = TestLinker.Create(set).ProcessMarkup("<p>Ask a content editor.</p>");
 

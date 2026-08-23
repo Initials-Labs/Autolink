@@ -2,6 +2,8 @@ using Microsoft.Extensions.Logging;
 using OC.AutoLink.Caching;
 using OC.AutoLink.Persistence;
 using OC.AutoLink.Persistence.Migrations;
+using OC.AutoLink.Relations;
+using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Infrastructure.Migrations;
 using Umbraco.Cms.Infrastructure.Migrations.Upgrade;
@@ -37,24 +39,33 @@ public interface IAutoLinkUninstaller
 /// broken with a store that logs and returns empty. Resetting the state to the plan's initial value is what makes a
 /// reinstall work.
 /// </para>
-/// Document types are deliberately left alone. The keyword property holds editors' data, and deleting it would take
-/// every keyword on every page with it — that is not a package's decision to make.
+/// Document types are deliberately left alone, and only this plan is rewound — not the <c>OC.AutoLink.Schema</c> plan
+/// that added the scan opt-out property. Rewinding that one would have a reinstall re-add a property somebody may
+/// have removed on purpose, and re-adding schema is not what "remove the data" means.
+/// <para>
+/// Worth being clear about what this does destroy. These two tables are the only place keywords live, so a teardown
+/// is not "lose the overrides and keep the keywords" — it is all of them. That is the right behaviour for removing a
+/// package and the wrong thing to run by accident, which is what the confirmation token on the endpoint is for.
+/// </para>
 /// </remarks>
 public sealed class AutoLinkUninstaller : IAutoLinkUninstaller
 {
     private readonly IScopeProvider _scopeProvider;
     private readonly IKeyValueService _keyValueService;
+    private readonly IRelationService _relationService;
     private readonly IKeywordRegistryInvalidator _invalidator;
     private readonly ILogger<AutoLinkUninstaller> _logger;
 
     public AutoLinkUninstaller(
         IScopeProvider scopeProvider,
         IKeyValueService keyValueService,
+        IRelationService relationService,
         IKeywordRegistryInvalidator invalidator,
         ILogger<AutoLinkUninstaller> logger)
     {
         _scopeProvider = scopeProvider;
         _keyValueService = keyValueService;
+        _relationService = relationService;
         _invalidator = invalidator;
         _logger = logger;
     }
@@ -73,15 +84,53 @@ public sealed class AutoLinkUninstaller : IAutoLinkUninstaller
             scope.Database.Execute($"DROP TABLE IF EXISTS {KeywordSuppressionDto.TableName}");
         }
 
+        RemoveRelations();
+
         _keyValueService.SetValue(upgrader.StateValueKey, plan.InitialState);
 
         // Whatever the registry was holding is now built on tables that no longer exist.
         _invalidator.InvalidateEverywhere();
 
         _logger.LogWarning(
-            "Auto-link data removed: both decision tables dropped and the migration state at {Key} reset. Document types were left untouched.",
+            "Auto-link data removed: every keyword and suppression dropped with their tables, and the migration state at {Key} reset. Document types were left untouched.",
             upgrader.StateValueKey);
 
         return new AutoLinkUninstallResult(upgrader.StateValueKey);
+    }
+
+    /// <summary>
+    /// Drops the relation type and every relation written under it.
+    /// </summary>
+    /// <remarks>
+    /// Deleting the type takes its relations with it, but they are cleared first regardless: this runs against
+    /// whatever state the database is actually in, and a half-finished install with relations and no type is
+    /// exactly the case a teardown exists to mop up.
+    /// <para>
+    /// Only ours. Relation types Umbraco ships, and any somebody else made, are none of this method's business.
+    /// </para>
+    /// </remarks>
+    private void RemoveRelations()
+    {
+        try
+        {
+            IRelationType? relationType = _relationService.GetRelationTypeByAlias(AutoLinkRelation.Alias);
+
+            if (relationType is null)
+            {
+                return;
+            }
+
+            _relationService.DeleteRelationsOfType(relationType);
+            _relationService.Delete(relationType);
+
+            _logger.LogWarning("Auto-link relation type {Alias} and its relations removed.", AutoLinkRelation.Alias);
+        }
+        catch (Exception ex)
+        {
+            // The tables are the data; the relations are bookkeeping over content that still exists. Failing here
+            // must not leave the tables dropped but the migration state untouched, which is the one combination
+            // that comes back broken.
+            _logger.LogError(ex, "Could not remove the auto-link relation type. Delete it by hand in Settings.");
+        }
     }
 }

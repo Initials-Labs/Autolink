@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.RegularExpressions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -9,11 +8,9 @@ using OC.AutoLink.Persistence;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Models.PublishedContent;
-using Umbraco.Cms.Core.PublishedCache;
 using Umbraco.Cms.Core.Routing;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Web;
-using Umbraco.Extensions;
 
 namespace OC.AutoLink.Registry;
 
@@ -67,10 +64,9 @@ public sealed class KeywordRegistry : IKeywordRegistry
                 }
 
                 _logger.LogInformation(
-                    "Auto-link keyword registry rebuilt: {Cultures} culture set(s), {Count} keyword(s), {Conflicts} unsettled conflict(s), stamp {Stamp}.",
+                    "Auto-link keyword registry rebuilt: {Cultures} culture set(s), {Count} keyword(s), stamp {Stamp}.",
                     rebuilt.Cultures.Count,
                     rebuilt.Cultures.Values.Sum(c => c.Targets.Count),
-                    rebuilt.Cultures.Values.Sum(c => c.Conflicts.Count),
                     rebuilt.Stamp);
 
                 _snapshot = rebuilt;
@@ -83,6 +79,15 @@ public sealed class KeywordRegistry : IKeywordRegistry
     /// <inheritdoc />
     public void Invalidate() => _dirty = true;
 
+    /// <summary>
+    /// Builds every culture's keyword set from the stored keyword rows.
+    /// </summary>
+    /// <remarks>
+    /// The rows are the only source. Keywords used to be collected from a Tags property on every target page as
+    /// well, which meant two pages could claim the same phrase and the registry had to report a collision rather
+    /// than guess at one — a whole subsystem for a situation the table cannot represent, since a keyword has one
+    /// row per culture and a row has one destination.
+    /// </remarks>
     private KeywordSnapshot Build()
     {
         AutoLinkOptions options = _options.CurrentValue;
@@ -90,11 +95,11 @@ public sealed class KeywordRegistry : IKeywordRegistry
 
         try
         {
-            // ITagQuery is scoped, so the singleton registry resolves it per rebuild rather than holding one.
+            // The stores and Umbraco's services are scoped, so the singleton registry resolves them per rebuild
+            // rather than holding on to one.
             using IServiceScope scope = _scopeFactory.CreateScope();
 
             var umbracoContextFactory = scope.ServiceProvider.GetRequiredService<IUmbracoContextFactory>();
-            var tagQuery = scope.ServiceProvider.GetRequiredService<ITagQuery>();
             var urlProvider = scope.ServiceProvider.GetRequiredService<IPublishedUrlProvider>();
             var contentService = scope.ServiceProvider.GetRequiredService<IContentService>();
             var languageService = scope.ServiceProvider.GetRequiredService<ILanguageService>();
@@ -117,24 +122,14 @@ public sealed class KeywordRegistry : IKeywordRegistry
             // always an ambient context to resolve URLs against.
             using UmbracoContextReference contextReference = umbracoContextFactory.EnsureUmbracoContext();
 
-            // Fetched once and reused for every culture: the invariant claimants are the same content whichever
-            // language is being built, and only the URLs resolved from them differ.
-            List<IPublishedContent> invariantClaimants =
-                tagQuery.GetContentByTagGroup(options.TagGroup, null).ToList();
+            // One query for every page any keyword points at, shared across cultures. The tags query used to hand
+            // back published content with its name already attached; without it, a name would otherwise be a
+            // database round trip per keyword per culture.
+            IReadOnlyDictionary<Guid, IContent> pages = FetchPages(contentService, allMappings);
 
-            // The invariant set. On a site whose keyword property does not vary this is the whole story; on one
-            // that does, the culture-free tags query returns nothing and this set is simply empty.
             foreach (string culture in cultures.Prepend(KeywordSnapshot.InvariantCulture))
             {
-                sets[culture] = BuildSet(
-                    culture,
-                    options,
-                    tagQuery,
-                    urlProvider,
-                    contentService,
-                    invariantClaimants,
-                    allMappings,
-                    allSuppressions);
+                sets[culture] = BuildSet(culture, options, urlProvider, pages, allMappings, allSuppressions);
             }
         }
         catch (Exception ex)
@@ -148,59 +143,47 @@ public sealed class KeywordRegistry : IKeywordRegistry
     }
 
     /// <summary>
+    /// Every page a keyword row points at, by key. A key with no row here is a page that has been deleted, which
+    /// resolves to nothing rather than to a broken link.
+    /// </summary>
+    private static IReadOnlyDictionary<Guid, IContent> FetchPages(
+        IContentService contentService,
+        IReadOnlyList<KeywordMapping> allMappings)
+    {
+        Guid[] keys = allMappings
+            .Where(mapping => !mapping.IsExternal && mapping.TargetKey != Guid.Empty)
+            .Select(mapping => mapping.TargetKey)
+            .Distinct()
+            .ToArray();
+
+        if (keys.Length == 0)
+        {
+            return new Dictionary<Guid, IContent>();
+        }
+
+        return contentService.GetByIds(keys).ToDictionary(content => content.Key);
+    }
+
+    /// <summary>
     /// Builds one culture's keyword set.
     /// </summary>
     private CultureKeywordSet BuildSet(
         string culture,
         AutoLinkOptions options,
-        ITagQuery tagQuery,
         IPublishedUrlProvider urlProvider,
-        IContentService contentService,
-        IReadOnlyList<IPublishedContent> invariantClaimants,
+        IReadOnlyDictionary<Guid, IContent> pages,
         IReadOnlyList<KeywordMapping> allMappings,
         IReadOnlyList<KeywordSuppression> allSuppressions)
     {
-        var candidates = new Dictionary<string, List<KeywordCandidate>>(StringComparer.OrdinalIgnoreCase);
         var targets = new Dictionary<string, KeywordTarget>(StringComparer.OrdinalIgnoreCase);
-        var conflicts = new List<KeywordConflict>();
 
         Dictionary<string, KeywordMapping> mappings = KeywordMapping.InForce(allMappings, culture);
         IReadOnlyDictionary<string, IReadOnlyList<KeywordSuppression>> suppressions =
             SuppressionsFor(allSuppressions, culture);
 
-        // Invariant tags apply to every culture, so a site mixing varying and non-varying target doctypes resolves
-        // both. Duplicate claimants are deduplicated by node key. The invariant claimants are passed in because they
-        // are the same content for every culture — only the URLs they resolve to differ.
-        CollectCandidates(options, urlProvider, candidates, invariantClaimants, KeywordSnapshot.InvariantCulture, culture);
-
-        if (culture.Length > 0)
+        foreach ((string keyword, KeywordMapping mapping) in mappings)
         {
-            CollectCandidates(
-                options,
-                urlProvider,
-                candidates,
-                tagQuery.GetContentByTagGroup(options.TagGroup, culture).ToList(),
-                culture,
-                culture);
-        }
-
-        // Sorted once, after both passes: stable order so the backoffice conflict list does not
-        // shuffle between rebuilds.
-        foreach (List<KeywordCandidate> claimants in candidates.Values)
-        {
-            claimants.Sort((a, b) => string.CompareOrdinal(a.Url, b.Url));
-        }
-
-        IEnumerable<string> keywords = candidates.Keys.Union(mappings.Keys, StringComparer.OrdinalIgnoreCase);
-
-        foreach (string keyword in keywords)
-        {
-            List<KeywordCandidate> claimants = candidates.TryGetValue(keyword, out List<KeywordCandidate>? found)
-                ? found
-                : [];
-
-            KeywordTarget? resolved = Resolve(
-                keyword, claimants, mappings, options, urlProvider, contentService, conflicts, culture);
+            KeywordTarget? resolved = Resolve(keyword, mapping, options, urlProvider, pages, culture);
 
             if (resolved is not null)
             {
@@ -208,18 +191,7 @@ public sealed class KeywordRegistry : IKeywordRegistry
             }
         }
 
-        IReadOnlyDictionary<string, IReadOnlyList<KeywordCandidate>> frozenCandidates = candidates.ToDictionary(
-            pair => pair.Key,
-            pair => (IReadOnlyList<KeywordCandidate>)pair.Value,
-            StringComparer.OrdinalIgnoreCase);
-
-        return new CultureKeywordSet(
-            culture,
-            targets,
-            frozenCandidates,
-            conflicts,
-            suppressions,
-            KeywordMatcher.For(targets.Keys, conflicts));
+        return new CultureKeywordSet(culture, targets, suppressions, KeywordMatcher.For(targets.Keys));
     }
 
     /// <summary>
@@ -238,135 +210,64 @@ public sealed class KeywordRegistry : IKeywordRegistry
                 StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Walks the tag group and records every page claiming every keyword. Nothing is discarded here — the original
-    /// version dropped the second claimant on the floor, which is the bug the mapping layer exists to fix.
+    /// Turns one stored row into a destination, or nothing when it will not resolve in this culture.
     /// </summary>
-    /// <param name="queryCulture">Culture to query tags for, empty for invariant tags.</param>
-    /// <param name="urlCulture">Culture to resolve URLs and names for, the culture of the set being built.</param>
-    private static void CollectCandidates(
-        AutoLinkOptions options,
-        IPublishedUrlProvider urlProvider,
-        Dictionary<string, List<KeywordCandidate>> candidates,
-        IReadOnlyList<IPublishedContent> claimants,
-        string queryCulture,
-        string urlCulture)
-    {
-        string? tagCulture = queryCulture.Length == 0 ? null : queryCulture;
-        string? linkCulture = urlCulture.Length == 0 ? null : urlCulture;
-
-        foreach (IPublishedContent content in claimants)
-        {
-            IEnumerable<string>? keywords =
-                content.Value<IEnumerable<string>>(options.KeywordsPropertyAlias, tagCulture);
-
-            if (keywords is null)
-            {
-                continue;
-            }
-
-            string? url = urlProvider.GetUrl(content, UrlMode.Relative, linkCulture);
-            if (!IsRoutable(url))
-            {
-                // Unroutable in this culture: no template, outside a configured hostname, or not published in this
-                // language at all. Not a usable target, and linking to another language would be worse.
-                continue;
-            }
-
-            foreach (string keyword in keywords)
-            {
-                string trimmed = keyword.Trim();
-                if (trimmed.Length == 0)
-                {
-                    continue;
-                }
-
-                if (!candidates.TryGetValue(trimmed, out List<KeywordCandidate>? existing))
-                {
-                    existing = [];
-                    candidates[trimmed] = existing;
-                }
-
-                if (existing.All(c => c.TargetKey != content.Key))
-                {
-                    existing.Add(new KeywordCandidate(content.Key, url!, content.Name));
-                }
-            }
-        }
-    }
-
-    /// <summary>
-    /// Precedence: a manual mapping, then an uncontested tag, then whatever the collision behaviour says.
-    /// </summary>
+    /// <remarks>
+    /// A row that resolves to nothing drops the keyword from this culture's set rather than failing the build, and
+    /// the Auto-linking screen reports it as unresolved. That report is the only way anybody would find out that a
+    /// page a keyword points at has been deleted, unpublished, or never published in this language — there is no
+    /// second source to quietly fall back to any more.
+    /// </remarks>
     private KeywordTarget? Resolve(
         string keyword,
-        List<KeywordCandidate> claimants,
-        Dictionary<string, KeywordMapping> mappings,
+        KeywordMapping mapping,
         AutoLinkOptions options,
         IPublishedUrlProvider urlProvider,
-        IContentService contentService,
-        List<KeywordConflict> conflicts,
+        IReadOnlyDictionary<Guid, IContent> pages,
         string culture)
     {
-        if (mappings.TryGetValue(keyword, out KeywordMapping? mapping))
+        if (mapping.IsExternal)
         {
-            if (mapping.IsExternal)
+            // Revalidated on the way out: a row written by any route other than the API must not be able to
+            // put a hostile scheme in an href.
+            if (ExternalUrl.TryNormalise(mapping.ExternalUrl, out string? external))
             {
-                // Revalidated on the way out: a row written by any route other than the API must not be able to
-                // put a hostile scheme in an href.
-                if (ExternalUrl.TryNormalise(mapping.ExternalUrl, out string? external))
-                {
-                    return new KeywordTarget(
-                        keyword,
-                        Guid.Empty,
-                        external,
-                        mapping.Label is { Length: > 0 } label ? label : ExternalUrl.Describe(external),
-                        KeywordSource.External,
-                        RelFor(mapping, options));
-                }
-
-                _logger.LogWarning(
-                    "Auto-link external mapping for {Keyword} is not an absolute http or https URL and was ignored.",
-                    keyword);
+                return new KeywordTarget(
+                    keyword,
+                    Guid.Empty,
+                    external,
+                    mapping.Label is { Length: > 0 } label ? label : ExternalUrl.Describe(external),
+                    KeywordSource.External,
+                    RelFor(mapping, options));
             }
 
-            KeywordCandidate? chosen = claimants.FirstOrDefault(c => c.TargetKey == mapping.TargetKey);
-            if (chosen is not null)
-            {
-                return new KeywordTarget(keyword, chosen.TargetKey, chosen.Url, chosen.TargetName, KeywordSource.Manual);
-            }
-
-            // Mapped to something outside the tag set, so it never came through the tags query.
-            KeywordCandidate? direct = ResolveByKey(mapping.TargetKey, urlProvider, contentService, culture);
-            if (direct is not null)
-            {
-                return new KeywordTarget(keyword, direct.TargetKey, direct.Url, direct.TargetName, KeywordSource.Manual);
-            }
-
-            // Stale mapping: the target is gone, unpublished, unroutable, or has no version in this culture. Fall
-            // through to automatic resolution rather than dropping the keyword, and say so.
             _logger.LogWarning(
-                "Auto-link mapping for {Keyword} points at {TargetKey}, which is not a routable published page in culture {Culture}. Falling back to automatic resolution.",
-                keyword,
-                mapping.TargetKey,
-                culture.Length == 0 ? "(invariant)" : culture);
-        }
+                "Auto-link keyword {Keyword} has an external URL that is not absolute http or https, so it will not link.",
+                keyword);
 
-        if (claimants.Count == 1)
-        {
-            KeywordCandidate only = claimants[0];
-            return new KeywordTarget(keyword, only.TargetKey, only.Url, only.TargetName, KeywordSource.Tag);
-        }
-
-        if (claimants.Count == 0)
-        {
             return null;
         }
 
-        // Contested, and nothing settles it: report it and link nothing. A confidently wrong link is worse than no
-        // link, and an unlinked keyword is what sends somebody to the dashboard to make the call.
-        conflicts.Add(new KeywordConflict(keyword, claimants));
+        string? culturePart = culture.Length == 0 ? null : culture;
+        string? url = urlProvider.GetUrl(mapping.TargetKey, UrlMode.Relative, culturePart);
 
-        return null;
+        if (!IsRoutable(url))
+        {
+            _logger.LogWarning(
+                "Auto-link keyword {Keyword} points at {TargetKey}, which is not a routable published page in culture {Culture}, so it will not link there.",
+                keyword,
+                mapping.TargetKey,
+                culture.Length == 0 ? "(invariant)" : culture);
+
+            return null;
+        }
+
+        // A variant page carries a name per language, and the name is what the anchor's title attribute says.
+        // GetCultureName returns null for a page whose type does not vary, hence the fallback.
+        pages.TryGetValue(mapping.TargetKey, out IContent? page);
+        string name = page?.GetCultureName(culturePart) ?? page?.Name ?? string.Empty;
+
+        return new KeywordTarget(keyword, mapping.TargetKey, url!, name, KeywordSource.Manual);
     }
 
     /// <summary>
@@ -384,36 +285,12 @@ public sealed class KeywordRegistry : IKeywordRegistry
         return options.ExternalLinkRel.Length > 0 ? options.ExternalLinkRel : "nofollow";
     }
 
-    /// <summary>
-    /// Resolves a mapped page that no tag pointed at.
-    /// </summary>
-    /// <remarks>
-    /// <see cref="IPublishedUrlProvider"/> takes a key directly, which keeps this synchronous — the published
-    /// content cache is async-only in v17 and the registry build is not. The content service call is for the
-    /// display name alone, only for these mapping-only keywords, on a rebuild that happens rarely.
-    /// </remarks>
-    private static KeywordCandidate? ResolveByKey(
-        Guid targetKey,
-        IPublishedUrlProvider urlProvider,
-        IContentService contentService,
-        string culture)
-    {
-        string? url = urlProvider.GetUrl(targetKey, UrlMode.Relative, culture.Length == 0 ? null : culture);
-        if (!IsRoutable(url))
-        {
-            return null;
-        }
-
-        IContent? content = contentService.GetById(targetKey);
-        return new KeywordCandidate(targetKey, url!, content?.Name ?? string.Empty);
-    }
-
     private static bool IsRoutable(string? url) => !string.IsNullOrWhiteSpace(url) && url != "#";
 
     /// <summary>
-    /// Hashes every culture's resolved targets, candidates and suppressions together. Changes only when the
-    /// linking behaviour or the choices on offer would actually differ, so a typo fix on a target page does not
-    /// move the stamp, while a keyword added in one language does.
+    /// Hashes every culture's resolved targets and suppressions together. Changes only when the linking behaviour
+    /// would actually differ, so a typo fix in body copy on a target page does not move the stamp, while a keyword
+    /// added in one language does.
     /// </summary>
     private static string ComputeStamp(Dictionary<string, CultureKeywordSet> sets)
     {
@@ -428,21 +305,6 @@ public sealed class KeywordRegistry : IKeywordRegistry
                 builder.Append(target.Keyword).Append('\u001F')
                     .Append(target.Url).Append('\u001F')
                     .Append(target.Source).Append('\u001E');
-            }
-
-            builder.Append('\u001D');
-
-            foreach ((string keyword, IReadOnlyList<KeywordCandidate> claimants) in set.Candidates
-                         .OrderBy(p => p.Key, StringComparer.OrdinalIgnoreCase))
-            {
-                builder.Append(keyword).Append('\u001F');
-
-                foreach (KeywordCandidate candidate in claimants)
-                {
-                    builder.Append(candidate.Url).Append('\u001C');
-                }
-
-                builder.Append('\u001E');
             }
 
             builder.Append('\u001D');

@@ -4,7 +4,7 @@ using Umbraco.Cms.Infrastructure.Persistence.DatabaseAnnotations;
 namespace OC.AutoLink.Persistence;
 
 /// <summary>
-/// A manual keyword to page mapping.
+/// A keyword and its destination. There is no other source of keywords.
 /// </summary>
 /// <remarks>
 /// The keyword is stored twice on purpose. <c>keywordKey</c> is lower-cased and carries the unique index, so
@@ -30,8 +30,8 @@ internal sealed class KeywordMappingDto
     public string KeywordKey { get; set; } = string.Empty;
 
     /// <summary>
-    /// Culture the decision applies to, or empty for every culture. Keywords differ per language, so which page
-    /// a contested one belongs to is a per-language decision.
+    /// Culture the keyword applies to, or empty for every culture. The same word can point somewhere different in
+    /// each language, so the culture is part of the row's identity.
     /// </summary>
     [Column("culture")]
     [Length(20)]
@@ -50,8 +50,8 @@ internal sealed class KeywordMappingDto
 
     /// <summary>
     /// An absolute URL outside the site, when the destination is not a page. Exactly one of this and
-    /// <see cref="TargetKey"/> is meaningful: a destination chosen by hand is a destination either way, so it lives
-    /// in one table with one precedence rule rather than a parallel one with its own.
+    /// <see cref="TargetKey"/> is meaningful: a destination is a destination either way, so it lives in one table
+    /// with one precedence rule rather than a parallel one with its own.
     /// </summary>
     [Column("externalUrl")]
     [NullSetting(NullSetting = NullSettings.Null)]

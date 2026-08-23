@@ -5,35 +5,28 @@ using OC.AutoLink.Persistence;
 namespace OC.AutoLink.Registry;
 
 /// <summary>
-/// Everything the renderer needs for one culture: the lookup, the matcher, the candidates behind it and the
-/// suppressions holding it back.
+/// Everything the renderer needs for one culture: the lookup, the matcher, and the suppressions holding it back.
 /// </summary>
 /// <remarks>
-/// One of these per configured language, plus one for the invariant case. Keywords differ per language, and so do
-/// the URLs they resolve to, so a single shared set cannot express either.
+/// One of these per configured language, plus one for the invariant case. Keywords are decided per language, and so
+/// are the URLs they resolve to, so a single shared set cannot express either.
 /// </remarks>
 public sealed class CultureKeywordSet
 {
     public static readonly CultureKeywordSet Empty = new(
         string.Empty,
         new Dictionary<string, KeywordTarget>(StringComparer.OrdinalIgnoreCase),
-        new Dictionary<string, IReadOnlyList<KeywordCandidate>>(StringComparer.OrdinalIgnoreCase),
-        [],
         new Dictionary<string, IReadOnlyList<KeywordSuppression>>(StringComparer.OrdinalIgnoreCase),
         null);
 
     public CultureKeywordSet(
         string culture,
         IReadOnlyDictionary<string, KeywordTarget> targets,
-        IReadOnlyDictionary<string, IReadOnlyList<KeywordCandidate>> candidates,
-        IReadOnlyList<KeywordConflict> conflicts,
         IReadOnlyDictionary<string, IReadOnlyList<KeywordSuppression>> suppressions,
         Regex? matcher)
     {
         Culture = culture;
         Targets = targets;
-        Candidates = candidates;
-        Conflicts = conflicts;
         Suppressions = suppressions;
         Matcher = matcher;
     }
@@ -41,14 +34,8 @@ public sealed class CultureKeywordSet
     /// <summary>The culture this set is for, or empty for the invariant one.</summary>
     public string Culture { get; }
 
-    /// <summary>Keyword to resolved target, case-insensitive. Unresolved keywords are absent.</summary>
+    /// <summary>Keyword to resolved target, case-insensitive. A keyword whose destination will not resolve is absent.</summary>
     public IReadOnlyDictionary<string, KeywordTarget> Targets { get; }
-
-    /// <summary>Every page that claimed each keyword in this culture, whether or not it won.</summary>
-    public IReadOnlyDictionary<string, IReadOnlyList<KeywordCandidate>> Candidates { get; }
-
-    /// <summary>Keywords claimed by more than one page in this culture with nothing to settle it.</summary>
-    public IReadOnlyList<KeywordConflict> Conflicts { get; }
 
     /// <summary>
     /// Keyword to the suppression rows applying to it in this culture.

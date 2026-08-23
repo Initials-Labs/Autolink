@@ -4,8 +4,9 @@ namespace OC.AutoLink.Persistence;
 /// Where a keyword should point: a page in this site, or a URL outside it.
 /// </summary>
 /// <remarks>
-/// One type rather than a growing parameter list on the store, and one concept in the UI. A destination chosen by
-/// hand behaves the same either way — it beats the tags, it is scoped to a culture, and it can be undone.
+/// One type rather than a growing parameter list on the store, and one concept in the UI. A destination behaves the
+/// same either way — it is scoped to a culture, it can be changed, and it can be removed. Which is also why the
+/// link picker on the keywords screen is the multi-URL one: picking a page and typing a URL are the same act.
 /// </remarks>
 public sealed record KeywordDestination
 {

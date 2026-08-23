@@ -1,7 +1,7 @@
 namespace OC.AutoLink.Api.Models;
 
 /// <summary>
-/// Everything the mapping screen needs in one call: the rows, and the counts for the header.
+/// Everything the keywords screen needs in one call: the rows, and the counts for the header.
 /// </summary>
 public sealed class KeywordOverviewResponseModel
 {
@@ -9,8 +9,8 @@ public sealed class KeywordOverviewResponseModel
     public required string Stamp { get; init; }
 
     /// <summary>
-    /// One entry per culture, plus the invariant one under an empty culture. Keywords differ per language, so the
-    /// whole table does.
+    /// One entry per culture, plus the invariant one under an empty culture. Keywords are decided per language, so
+    /// the whole table is.
     /// </summary>
     public required IEnumerable<CultureOverviewResponseModel> Cultures { get; init; }
 }
@@ -25,57 +25,60 @@ public sealed class CultureOverviewResponseModel
 
     public required int Total { get; init; }
 
-    /// <summary>Keywords more than one page claims with nothing settling it.</summary>
-    public required int Conflicts { get; init; }
+    /// <summary>
+    /// Keywords whose destination will not resolve here.
+    /// </summary>
+    /// <remarks>
+    /// The count worth a badge. It replaces what used to be the conflict count: two pages can no longer claim the
+    /// same phrase, so the thing that now needs somebody's attention is a keyword pointing at a page that has been
+    /// deleted, unpublished, or never published in this language.
+    /// </remarks>
+    public required int Unresolved { get; init; }
 
-    /// <summary>Keywords somebody has made a decision about.</summary>
-    public required int Manual { get; init; }
+    /// <summary>Keywords pointing somewhere outside the site.</summary>
+    public required int External { get; init; }
 
     public required IEnumerable<KeywordRowResponseModel> Keywords { get; init; }
 }
 
 /// <summary>
-/// One keyword, what it currently resolves to, and every page that wanted it.
+/// One keyword and where it points.
 /// </summary>
 public sealed class KeywordRowResponseModel
 {
     public required string Keyword { get; init; }
 
-    /// <summary>tag, manual, debug or unresolved.</summary>
+    /// <summary>manual, external, or unresolved.</summary>
     public required string Source { get; init; }
 
-    /// <summary>True when this keyword is contested and nothing has settled it.</summary>
-    public required bool HasConflict { get; init; }
-
+    /// <summary>
+    /// The page this keyword points at, straight off the stored row rather than off the resolved target, so the
+    /// screen can put an unresolved keyword back in the link picker instead of only reporting that it is broken.
+    /// Null for an external link.
+    /// </summary>
     public Guid? TargetKey { get; init; }
 
     public string? TargetName { get; init; }
 
+    /// <summary>The resolved destination, or null when it will not resolve in this culture.</summary>
     public string? Url { get; init; }
+
+    /// <summary>The stored URL for an external link, resolved or not. Null when the destination is a page.</summary>
+    public string? ExternalUrl { get; init; }
+
+    /// <summary>Title for an external link, or null to fall back to the host.</summary>
+    public string? Label { get; init; }
+
+    /// <summary>Whether this external link overrides the configured rel default. Null follows it.</summary>
+    public bool? Nofollow { get; init; }
 
     public DateTime? UpdateDate { get; init; }
 
     public string? UpdatedBy { get; init; }
 
     /// <summary>
-    /// Culture the decision in force was made for, or empty when it applies to every culture. Lets the screen say
-    /// "set for all languages" rather than implying the decision is specific to the culture being viewed.
+    /// Culture the row in force was written for, or empty when it applies to every culture. Lets the screen say
+    /// "set for all languages" rather than implying the keyword is specific to the culture being viewed.
     /// </summary>
     public string? MappingCulture { get; init; }
-
-    public required IEnumerable<KeywordCandidateResponseModel> Candidates { get; init; }
-}
-
-/// <summary>
-/// A page claiming the keyword. These are the exact options the renderer considered.
-/// </summary>
-public sealed class KeywordCandidateResponseModel
-{
-    public required Guid TargetKey { get; init; }
-
-    public required string TargetName { get; init; }
-
-    public required string Url { get; init; }
-
-    public required bool IsSelected { get; init; }
 }

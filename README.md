@@ -3,9 +3,13 @@
 An Umbraco 17 package that turns keyword mentions in Rich Text Editor content into links to the corresponding
 page, **at render time**, with no editor action required.
 
-Write "we tested this with Claude AI last week" in an RTE. If a page is tagged with the keyword `Claude AI`, the
-phrase renders as a link to it. Write it *before* that page exists, and the link appears the day somebody creates
-it — no republishing, no backfill, because stored markup is never touched.
+Write "we tested this with Claude AI last week" in an RTE. If the keyword `Claude AI` points at a page, the phrase
+renders as a link to it. Write it *before* that page exists, and the link appears the day somebody adds the keyword —
+no republishing, no backfill, because stored markup is never touched.
+
+Keywords are managed in one place, a custom **Auto-linking** section, using Umbraco's Multi URL Picker to send each
+one at a page or at an address outside the site. Nothing is added to your document types and there is nothing for an
+editor to fill in per page.
 
 ## Layout
 
@@ -30,9 +34,9 @@ Then `https://localhost:44307/umbraco`. Two things to know:
   placeholder so a real credential never lands in git, and the site installs itself unattended with whatever you
   put there.
 
-The database, logs and media are deliberately not committed. A clone installs itself, Clean supplies the content,
-and `AutoLinkSchemaInstaller` adds the keyword property to the document types — so the site comes up working, but
-empty of the demo's own tags. Expect to add a couple of keywords before the auto-linking has anything to do.
+The database, logs and media are deliberately not committed. A clone installs itself and Clean supplies the content,
+so the site comes up working but with no keywords in it. Add a couple on the Auto-linking screen before expecting the
+linker to have anything to do.
 
 ## The backoffice
 
@@ -40,8 +44,8 @@ A custom **Auto-linking** section with one Keywords screen. It needs granting to
 User Groups → Administrators → Sections. A new section is not granted to anybody by default, including
 administrators.
 
-The screen shows both halves of every keyword — the page it links to, and the pages that mention it — and lets you
-settle keywords two pages both claim, switch individual links off, and point a keyword at an external URL.
+The screen shows both halves of every keyword — where it links to, and the pages that mention it — and is where you
+add keywords, change where one points, and switch individual links off.
 
 ## Conventions
 

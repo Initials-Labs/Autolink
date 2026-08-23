@@ -10,9 +10,14 @@ namespace OC.AutoLink.Api.Controllers;
 /// Teardown, for removing the package cleanly.
 /// </summary>
 /// <remarks>
-/// Deliberately not surfaced as a button in the dashboard. It destroys every mapping and suppression on the site, and
-/// a destructive action one click away from the screen editors use every day is a mistake waiting to happen. It is an
-/// explicit call for whoever is removing the package.
+/// Deliberately not surfaced as a button in the dashboard. It destroys every keyword on the site, and a destructive
+/// action one click away from the screen editors use every day is a mistake waiting to happen. It is an explicit
+/// call for whoever is removing the package.
+/// <para>
+/// The blast radius grew when keywords stopped living on document types. These tables used to hold decisions
+/// layered over tags, so a teardown lost the decisions and left the keywords themselves in the content. They are
+/// now the only place keywords exist, so this drops the lot.
+/// </para>
 /// <para>
 /// It also asks for more than the section: everything else here is gated on access to the Auto-linking section, which
 /// is the permission an editor settling keyword collisions holds. Dropping both tables is not that permission, so this
@@ -32,8 +37,8 @@ public sealed class AutoLinkDataController : AutoLinkControllerBase
     public AutoLinkDataController(IAutoLinkUninstaller uninstaller) => _uninstaller = uninstaller;
 
     /// <summary>
-    /// Drops both decision tables and resets the migration state so a reinstall recreates them. Leaves document
-    /// types, the keyword property and its values alone.
+    /// Drops both keyword tables and resets that plan's migration state so a reinstall recreates them. Leaves
+    /// document types and their properties alone.
     /// </summary>
     [HttpDelete("data")]
     [ProducesResponseType(typeof(AutoLinkUninstallResult), StatusCodes.Status200OK)]
@@ -44,7 +49,7 @@ public sealed class AutoLinkDataController : AutoLinkControllerBase
         if (confirm != ConfirmationToken)
         {
             return BadRequest(
-                $"This removes every keyword mapping and suppression on the site. Send confirm={ConfirmationToken} if that is what you want.");
+                $"This removes every auto-link keyword on the site, and every link switched off by hand. There is nowhere else they are stored. Send confirm={ConfirmationToken} if that is what you want.");
         }
 
         return Ok(_uninstaller.RemoveData());

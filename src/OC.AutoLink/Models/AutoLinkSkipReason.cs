@@ -22,9 +22,6 @@ public static class AutoLinkSkipReason
     /// <summary>The per-keyword or per-page allowance was already spent.</summary>
     public const string LimitReached = "limit";
 
-    /// <summary>More than one page claims the keyword and nothing has settled it.</summary>
-    public const string Contested = "contested";
-
     /// <summary>Held back by an editorial decision.</summary>
     public const string Suppressed = "suppressed";
 }

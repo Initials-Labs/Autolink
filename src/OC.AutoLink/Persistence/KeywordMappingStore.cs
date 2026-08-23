@@ -49,9 +49,10 @@ public sealed class KeywordMappingStore : IKeywordMappingStore
         }
         catch (Exception ex)
         {
-            // Most likely the migration has not run yet. Degrade to automatic resolution rather than taking
-            // the whole registry down with us — tag-based linking is still useful without the mappings.
-            _logger.LogError(ex, "Could not read auto-link keyword mappings. Falling back to automatic resolution.");
+            // Most likely the migration has not run yet. Render unlinked rather than taking the whole registry
+            // down with us: no keywords is a site that behaves as though the package were not installed, which is
+            // survivable in a way that a failed request is not.
+            _logger.LogError(ex, "Could not read the auto-link keywords. Nothing will be auto-linked.");
             return [];
         }
     }
@@ -64,15 +65,15 @@ public sealed class KeywordMappingStore : IKeywordMappingStore
         string trimmed = keyword.Trim();
         if (trimmed.Length == 0)
         {
-            throw new ArgumentException("A mapping needs a keyword.", nameof(keyword));
+            throw new ArgumentException("A keyword is needed.", nameof(keyword));
         }
 
         Write(DecisionKey.Normalise(trimmed), trimmed, culture, destination, updatedBy);
 
         // Invalidated here rather than by the caller. This is the code that knows the rows changed, and an
         // invalidation nobody sends leaves every other server resolving the keyword the old way until the next
-        // content change. The stamp is a content hash, so re-saving the same decision costs a rebuild and nothing
-        // else.
+        // content change. The stamp is a content hash, so re-saving the same destination costs a rebuild and
+        // nothing else.
         _invalidator.InvalidateEverywhere();
     }
 
