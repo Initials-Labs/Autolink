@@ -689,6 +689,21 @@ Bound through `IOptionsMonitor`, so edits apply **without a restart**.
 and additive: an existing property is left alone, and nothing is ever renamed, moved or deleted. It is optional in
 every sense — without it, every page stays scannable.
 
+**One migration does delete something, and it is the exception that proves the rule.**
+`RemoveLegacyKeywordProperty` takes away the `linkKeywords` Tags property and the `Auto-link Keywords` datatype an
+earlier version installed. Keywords live in the package's own table now, so that property reads exactly like the
+one that used to work while doing nothing at all — and a field that silently does nothing is worse than no field.
+
+It is scoped by **datatype, not by configuration**: the property goes only where it is bound to the datatype this
+package created, so a `linkKeywords` somebody rebound to a Tags datatype of their own is left alone, and the
+datatype itself is deleted only once nothing points at it. If the datatype is absent the migration does nothing,
+which covers hand-built installs and every subsequent boot. It sits on the main plan rather than the schema one,
+because a site that installed the property and later turned `InstallSchema` off still needs it taken away.
+
+Removing the properties takes their stored values with them. It does **not** clear `cmsTags`: the rows in the tag
+group survive with no relationships pointing at them, which is ordinary Umbraco behaviour — core has no notion of
+collecting unused tags — and they are inert, since nothing queries that group any more.
+
 It is a **migration**, in its own `OC.AutoLink.Schema` plan, so it runs **once** rather than at every startup. That
 was the last startup-fixup left in the package, and it was the wrong shape for a shipping one: editing somebody's
 document types every time their site boots is nobody's expectation.
