@@ -24,9 +24,8 @@ export default {
 
 		// Summary line
 		keywordCount: (count) => (count === 1 ? '1 keyword' : `${count} keywords`),
-		needingDecision: 'needing a decision',
-		linkingOnPages: (count) =>
-			count === 1 ? 'linking on 1 page' : `linking on ${count} pages`,
+		needingAttention: (count) => (count === 1 ? '1 needs attention' : `${count} need attention`),
+		linkingOnPages: (count) => (count === 1 ? 'linking on 1 page' : `linking on ${count} pages`),
 		pagesChecked: (count) => `${count} pages checked, nothing stored`,
 
 		// Columns
@@ -38,29 +37,25 @@ export default {
 		showDetail: (keyword) => `Show detail for ${keyword}`,
 		hideDetail: (keyword) => `Hide detail for ${keyword}`,
 		detailFor: (keyword) => `Detail for ${keyword}`,
-		contestedSummary: 'two pages claim this — choose one below',
-		nothingYet: 'nothing yet',
-		chosenByHand: 'chosen by hand',
 		external: 'external',
+		unresolvedSummary: 'nothing links — the destination is gone',
 		countLinked: (count) => `${count} linked`,
 		countOff: (count) => `${count} off`,
 		countNotLinked: (count) => `${count} not linked`,
 		countNone: 'none',
 
-		// Detail: choosing a destination
-		chooseHeading: 'Choose the page this keyword should link to',
-		useThis: 'Use this',
-		untagInstead: 'Untagging one of them works too. This screen never edits anybody’s content.',
-		externalFor: (language) =>
-			`External link for ${language}. Nothing is tagged with this keyword, so removing the link removes the keyword.`,
-		removeLink: 'Remove link',
-		chosenFor: (language) => `Chosen by hand for ${language}.`,
-		chosenNoTag: (language) => `Chosen by hand for ${language}, and no page carries this tag.`,
-		undoChoice: 'Undo choice',
+		// Detail: the destination
+		setFor: (language, who) => `Set for ${language} by ${who}.`,
+		somebody: 'somebody',
+		changeDestination: 'Change destination',
+		removeKeyword: 'Remove keyword',
+		unresolvedPageDetail:
+			'The page this keyword points at is deleted, unpublished, or has no version in this language, so nothing links. Point it somewhere else, or remove the keyword.',
+		unresolvedExternalDetail:
+			'The stored address is not an absolute http or https URL, so nothing links. Point it somewhere else, or remove the keyword.',
 
 		// Detail: mentions
-		mentionedOn: (count) =>
-			count === 1 ? 'Mentioned on 1 page' : `Mentioned on ${count} pages`,
+		mentionedOn: (count) => (count === 1 ? 'Mentioned on 1 page' : `Mentioned on ${count} pages`),
 		noMentions: 'No published page in this language writes this word, so the link appears nowhere yet.',
 		linked: 'linked',
 		doNotLinkHere: 'Do not link here',
@@ -78,32 +73,35 @@ export default {
 		reasonHandLinked: 'somebody has already linked to that page here.',
 		reasonSkippedElement: 'the words sit inside a heading, or inside a link somebody added.',
 		reasonLimit: 'only the first mention on a page is linked.',
-		reasonContested: 'two or more pages claim this keyword, so nothing links.',
 
-		// Adding an external link
-		addExternal: 'Add external link',
+		// Adding a keyword and changing where one points
+		addKeyword: 'Add keyword',
 		cancel: 'Cancel',
-		addHeading: (culture) => `Link a keyword to somewhere outside the site, in ${culture}`,
+		addHeading: (language) => `Add a keyword for ${language}`,
+		editHeading: (keyword, language) => `Where “${keyword}” links to, in ${language}`,
 		fieldKeyword: 'Keyword',
 		fieldKeywordHint: 'Keyword, as it is written in the copy',
-		fieldUrl: 'URL',
-		fieldUrlHint: 'https://example.com',
+		fieldDestination: 'Links to',
 		fieldTitle: 'Title',
 		fieldTitleHint: 'Optional title, defaults to the host',
 		nofollowLabel: 'Add rel="nofollow", so a wall of outbound links does not read as a link scheme',
-		addLink: 'Add link',
-		addNeedsBoth: 'A keyword and a URL are both needed.',
+		saveKeyword: 'Save keyword',
+		thePage: 'the page',
+		needsKeywordAndDestination: 'A keyword and a destination are both needed.',
+		notAbsoluteUrl: 'An address outside the site has to start with http:// or https://.',
+		mediaNotSupported: 'A keyword can link to a page or to an address outside the site. Media is not supported.',
+		targetNotUsed: 'Auto-links never open a new window, so that choice will not be used.',
 
 		// Empty and error states
-		noKeywords: (culture) =>
-			`No keywords in ${culture}. Tag a page in this language, or check the configured tag group matches the datatype bound to the keyword property.`,
+		noKeywords: (language) =>
+			`No keywords in ${language} yet. Add one, and every page whose copy already writes that word links to it the next time it renders.`,
 		notAuthorised: (status) =>
 			`Not authorised (${status}). Your user group needs access to the Auto-linking section.`,
 		requestFailed: (status) => `The request failed (${status}).`,
 
 		// Confirmations
 		nowLinksTo: (keyword, target) => `“${keyword}” now links to ${target}.`,
-		backToAutomatic: (keyword) => `“${keyword}” is back on automatic resolution.`,
+		keywordRemoved: (keyword) => `“${keyword}” has been removed.`,
 		willNotLinkAnywhere: (keyword) => `“${keyword}” will not be linked anywhere.`,
 		willNotLinkOn: (keyword, page) => `“${keyword}” will not be linked on ${page}.`,
 		canLinkAgain: (keyword) => `“${keyword}” can link again.`,

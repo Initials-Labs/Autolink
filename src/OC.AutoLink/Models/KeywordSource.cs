@@ -1,17 +1,14 @@
 namespace OC.AutoLink.Models;
 
 /// <summary>
-/// Where a keyword's resolved target came from. Surfaced in the backoffice so an editor can tell a decision
-/// somebody made from one the registry made on its own.
+/// What kind of destination a keyword resolves to. Surfaced in the backoffice so a link that leaves the site is
+/// distinguishable from one that stays on it.
 /// </summary>
 public enum KeywordSource
 {
-    /// <summary>Exactly one page claimed the keyword, so no decision was needed.</summary>
-    Tag,
-
-    /// <summary>A manual mapping settled it. Wins over anything the tags say.</summary>
+    /// <summary>A page in this site, chosen on the Auto-linking screen.</summary>
     Manual,
 
-    /// <summary>A hand-made link to somewhere outside the site. No page behind it.</summary>
+    /// <summary>Somewhere outside the site. No page behind it.</summary>
     External,
 }

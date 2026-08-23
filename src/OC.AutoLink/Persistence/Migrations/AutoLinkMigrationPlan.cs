@@ -14,6 +14,7 @@ public sealed class AutoLinkMigrationPlan : MigrationPlan
             .To<AddKeywordMappingTable>("autolink-keyword-mapping-table")
             .To<AddKeywordSuppressionTable>("autolink-keyword-suppression-table")
             .To<AddCultureToDecisions>("autolink-decisions-culture")
-            .To<AddExternalLinkColumns>("autolink-external-links");
+            .To<AddExternalLinkColumns>("autolink-external-links")
+            .To<AddKeywordRelationType>("autolink-relation-type");
     }
 }

@@ -5,9 +5,10 @@
 An Umbraco 17 package that automatically turns keyword mentions in Rich Text Editor
 content into links to the corresponding page, with no editor action required.
 
-Example: an editor writes "we tested this with Claude AI last week" in an RTE. If a
-page in the content tree is tagged with the keyword `Claude AI`, the phrase renders as
-a link to that page. The editor did nothing.
+Example: an editor writes "we tested this with Claude AI last week" in an RTE. If the
+keyword `Claude AI` points at a page, the phrase renders as a link to that page. The
+editor did nothing, and nothing was added to their document type — keywords are curated
+centrally, in the Auto-linking section (decision 8).
 
 Working package name: `OC.AutoLink` (core), with an optional `OC.AutoLink.Automate`
 for side effects. Tentative, not yet committed to.
@@ -50,24 +51,29 @@ pages mention this keyword" — for auditing or invalidation reporting. Not core
 
 ### 3. Relations are an audit trail, not the mechanism
 
-Rejected as the driver of linking. Kept as an after-the-fact record: `autoLinkedTo`
-relations between mentioning page and target, written on a background job. Gives a free
-"what links here" panel and a precise invalidation set. **Out of scope for the PoC.**
+Rejected as the driver of linking. Kept as an after-the-fact record between mentioning
+page and target, giving a free "what links here" panel. Was out of scope for the PoC;
+**built later, for a reason the original note did not anticipate** — see decision 9.
+Nothing in the render path reads them, so the "not the mechanism" half still holds.
 
-### 4. Keyword collisions are settled by hand, not by heuristic
+### 4. Keyword collisions are settled by hand, not by heuristic — and then made impossible
 
 Added after the PoC, when two pages tagged with the same keyword turned out to resolve by tags-query order with
 the loser dropped silently.
 
 Which page a contested phrase should point at is an editorial decision. A priority number on the doctype, or
-"nearest ancestor wins", would silence the symptom without ever recording that a decision was made. So:
-resolution precedence is **manual mapping, then uncontested tag, then nothing**, and an unresolved collision is
-reported rather than guessed.
+"nearest ancestor wins", would silence the symptom without ever recording that a decision was made. So resolution
+precedence became **manual mapping, then uncontested tag, then nothing**, with an unresolved collision reported
+rather than guessed.
 
-Mappings live in `ocAutoLinkKeywordMapping` (real `MigrationPlan`), store the **target key rather than a URL**,
-and may point at a page carrying no tag at all — which is also how synonyms and plurals get expressed without
-polluting a target's tag list. Editing happens in a custom **Auto-linking** backoffice section reading straight
-off the registry snapshot, so the options offered are the ones the renderer considered.
+**Superseded by decision 8.** With the tags gone, a keyword has one row per culture and a row has one destination,
+so nothing can be contested and the whole conflict subsystem was deleted. The principle survives intact — it is
+just enforced by a unique index now instead of by reporting. Keep the principle in mind if a second source of
+keywords is ever proposed: it would bring the collisions back with it.
+
+Rows live in `ocAutoLinkKeywordMapping` (real `MigrationPlan`) and store the **target key rather than a URL**, so a
+page that moves still resolves. Several keywords may point at one page, which is how synonyms and plurals are
+expressed.
 
 ### 5. The audit is a dry-run scan, not stored relations
 
@@ -89,15 +95,15 @@ Suppressed keywords keep reserving their span so switching one off cannot promot
 
 The site went multilingual mid-PoC (en-US and en-GB, `linkKeywords` varying by culture), which broke the registry
 outright: `ITagQuery.GetContentByTagGroup(group)` with no culture argument returns **nothing** once the property
-varies, so every tag-driven link vanished silently.
+varies, so every tag-driven link vanished silently. That specific trap is gone with the tags query, but it is why
+the design is per culture at all.
 
-So the snapshot holds **one keyword set per configured language plus an invariant one**, each with its own targets,
-matcher, conflicts and suppressions, and each resolving URLs for its own culture. The renderer selects by
-`IVariationContextAccessor.VariationContext.Culture`. Invariant tags merge into every culture, so a site mixing
-varying and non-varying doctypes works.
+The snapshot holds **one keyword set per configured language plus an invariant one**, each with its own targets,
+matcher and suppressions, and each resolving URLs for its own culture. The renderer selects by
+`IVariationContextAccessor.VariationContext.Culture`.
 
-Both decision tables carry a culture, with empty meaning every culture, so a decision made before the site varied
-keeps applying. Culture-specific rows win over all-culture ones.
+Both tables carry a culture, with empty meaning every culture, so a keyword added before the site varied keeps
+applying and gets resolved separately for each language. Culture-specific rows win over all-culture ones.
 
 ### 7. An external link is a mapping row, not a second feature
 
@@ -105,12 +111,63 @@ Keywords can point outside the site. Rather than a parallel external-links table
 handling and UI, the mapping row gained a nullable `externalUrl` beside the nullable `targetKey`: "somebody chose
 where this keyword goes" is one concept whether the destination is a node or a URL.
 
-Consequence worth keeping in mind: **the dashboard now creates keywords**, since an external link has no page to tag.
-That is the only genuinely new capability; precedence, cultures, suppression, the audit and the caps all worked
-unchanged.
+Consequence worth keeping in mind: **the dashboard creates keywords**, since an external link has no page to tag.
+That was the only genuinely new capability — precedence, cultures, suppression, the audit and the caps all worked
+unchanged — and it turned out to be the thread that unravelled the tags entirely. See decision 8.
 
 External URLs are validated to absolute http or https at the API **and** again at registry build. This is the first
 editor-supplied string the package puts in an href, so it is a security boundary, not formatting.
+
+### 8. Keywords are managed centrally, not on document types
+
+The `linkKeywords` Tags property is gone. Keywords are created on the **Auto-linking** screen, and the destination
+is Umbraco's **Multi URL Picker** (`umb-input-multi-url`, capped at one item — how core does a single-link picker),
+which is what makes "a page" and "an outside URL" one decision made in one control.
+
+Decision 7 is what argued for this. A tag says "this page answers to this phrase", which reads well until you want
+a synonym, a plural, a phrase whose best target carries no tag, or a destination that is not a page at all. Every
+one of those already wanted a row in the table, so the table was the real source and the tags were a second way in
+that could disagree with it — and the disagreements were the collisions of decision 4.
+
+Rejected alternative: **keep reading tags as a secondary source** for sites already using them. That leaves two
+sources of truth, keeps the entire conflict subsystem alive to arbitrate between them, and makes "control it all
+from one screen" only half true. Not worth it for an unreleased package.
+
+Consequences to hold on to:
+
+- **No migration was written.** Existing tag values stay in the content, ignored. A site with tags starts with an
+  empty screen — which was the explicit call, not an oversight.
+- **Creating a target is two steps now**, publish then add the keyword. Retroactivity (decision 1) is untouched;
+  the work just moved from the content editor to one screen.
+- **A broken destination stops linking rather than falling back.** There is no tag left to fall back to, so the row
+  reports as unresolved. Unresolved rows sort first and open themselves.
+- **`excludeFromAutoLinking` stayed on the document type.** "Do not scan this page's copy" is genuinely a property
+  of the page, not of any keyword, so the schema installer still exists — for that one boolean.
+- **Teardown now destroys every keyword**, not just decisions layered over tags. There is no other copy.
+- The picker offers **media**, an **anchor**, and **open in new window**. The anchor is hidden, media is refused as
+  it is picked, and a set target prints a line saying it will not be used. Silently dropping editor input is the
+  thing being avoided in all three.
+
+### 9. Relations exist to make Umbraco do the warning
+
+Deleting the page a keyword points at silently breaks every auto-link to it. That is decision 1 working as
+designed — no dead anchors — but it means the damage is invisible at the moment somebody does it.
+
+Rather than build a warning, register the facts Umbraco already knows how to warn about: a relation type with
+**`isDependency: true`**, written between mentioning page and target. The Info tab's "Referenced by" list and the
+delete dialog's "The following items depend on this" then come for free.
+
+**The direction is the trap, and it is the opposite of the obvious reading.** Umbraco stores a reference with the
+*referencing* item as the parent — a Content Picker on A pointing at B is `parent=A, child=B` — and answers "what
+uses this" by looking up `childId`. Written target-as-parent it looks fine in the database and warns on entirely
+the wrong pages. Check `umbDocument` rows on a real site before trusting either reading.
+
+Written by reconciling against the scan, because that is the only thing that knows which pages carry links, and
+only for mentions that actually became anchors. Consequences: relations are as fresh as the last scan, and a
+keyword whose target nothing mentions has no relation and so raises no dependency warning.
+
+Deleting the page clears them — but Umbraco does that itself, during the delete, before `ContentDeletedNotification`
+fires. Our handler is a backstop that normally finds nothing. Do not "fix" it by assuming it is doing the work.
 
 Full write-up, including the v17 authorization traps that cost the most time, in `src/OC.AutoLink/README.md`.
 
@@ -120,15 +177,18 @@ Full write-up, including the v17 authorization traps that cost the most time, in
 
 ### Keyword registry
 
-A `linkKeywords` property (Tags datatype) on any doctype that can be a link target.
-Tags gives a queryable store for free and editors already know the UI. Sibling
-`excludeFromAutoLinking` boolean for pages that shouldn't be *scanned*.
+Rows in `ocAutoLinkKeywordMapping`, edited on the Auto-linking screen. Each row is a
+keyword, a culture, and either a page key or an absolute URL. There is no second source
+— see decision 8. The only page-level property left is the
+`excludeFromAutoLinking` boolean, for pages that shouldn't be *scanned*.
 
 ### Cached automaton
 
 Singleton service holding `Dictionary<string, KeywordTarget>` plus a single compiled
 `Regex` with alternation **sorted longest-first**, so `Claude AI Sonnet` wins over
 `Claude`. Resolved URLs cached alongside keys — URL resolution is most of the build cost.
+Target names come from one `IContentService.GetByIds` call per rebuild, not one per
+keyword per culture.
 
 Rebuilt lazily against a version stamp.
 
@@ -266,14 +326,16 @@ article-length markup may be fast enough that the cache is premature.
 
 ## Known unknowns — all resolved against 17.6.1
 
-- ~~URL resolution outside a request context.~~ **Resolved.** `ITagQuery.GetContentByTagGroup(group)` returns
-  `IEnumerable<IPublishedContent>` straight off the published cache, so the tags query and URL resolution
-  become the same call. Resolve with `IPublishedUrlProvider.GetUrl(content, UrlMode.Relative)` inside an
-  `IUmbracoContextFactory.EnsureUmbracoContext()` block, since rebuilds also fire from notification handlers.
+- ~~URL resolution outside a request context.~~ **Resolved.** `IPublishedUrlProvider.GetUrl(Guid, UrlMode.Relative,
+  culture)` takes a key directly, which keeps the build synchronous — `IPublishedContentCache` is async-only in v17.
+  Wrap it in an `IUmbracoContextFactory.EnsureUmbracoContext()` block, since rebuilds also fire from notification
+  handlers with no ambient context.
 - ~~`RichTextEditorValueConverter` constructor dependencies.~~ **Resolved by sidestepping** — see
   decorate-don't-subclass above.
-- ~~Exact tags query API surface.~~ **Resolved.** `ITagQuery` — note it is registered **scoped**, so a
-  singleton registry must resolve it from an `IServiceScope` per rebuild rather than holding one.
+- ~~Exact tags query API surface.~~ **Moot.** `ITagQuery` was the answer, and it is no longer used at all
+  (decision 8). Worth knowing if it ever comes back: it is registered **scoped**, so a singleton registry has to
+  resolve it from an `IServiceScope` per rebuild rather than holding one. The stores and services the registry does
+  use are scoped for the same reason and handled the same way.
 
 ### Gotcha that wasn't in the original design
 

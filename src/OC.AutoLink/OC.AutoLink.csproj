@@ -22,9 +22,10 @@
     <Title>OC.AutoLink for Umbraco</Title>
     <Description>
       Turns keyword mentions in Umbraco rich text into links to the corresponding page, at render time, with no
-      editor action required. Stored markup is never modified, so an article picks up a link the day somebody
-      creates its target. Includes a backoffice section for settling keywords two pages both claim, switching
-      individual links off, and pointing keywords at external URLs. Multilingual.
+      editor action required. Stored markup is never modified, so an article picks up a link the day somebody adds
+      the keyword. Keywords live in a backoffice section of their own rather than on your document types, and point
+      at a page or an external URL through Umbraco's Multi URL Picker. Shows which pages carry links and lets
+      individual ones be switched off. Multilingual.
     </Description>
     <PackageTags>umbraco;umbraco-marketplace;seo;internal-linking;rich-text</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>

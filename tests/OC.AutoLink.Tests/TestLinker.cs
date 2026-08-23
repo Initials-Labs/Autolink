@@ -47,13 +47,12 @@ internal static class TestLinker
             NullLogger<AutoLinker>.Instance);
     }
 
-    /// <summary>A set where each keyword points at a page, with no conflicts or suppressions.</summary>
+    /// <summary>A set where each keyword points at a page, with no suppressions.</summary>
     public static CultureKeywordSet Set(params KeywordTarget[] targets) =>
-        Set(targets, [], []);
+        Set(targets, []);
 
     public static CultureKeywordSet Set(
         IReadOnlyList<KeywordTarget> targets,
-        IReadOnlyList<KeywordConflict> conflicts,
         IReadOnlyList<KeywordSuppression> suppressions)
     {
         var lookup = targets.ToDictionary(t => t.Keyword, StringComparer.OrdinalIgnoreCase);
@@ -61,16 +60,14 @@ internal static class TestLinker
         return new CultureKeywordSet(
             KeywordSnapshot.InvariantCulture,
             lookup,
-            new Dictionary<string, IReadOnlyList<KeywordCandidate>>(StringComparer.OrdinalIgnoreCase),
-            conflicts,
             suppressions
                 .GroupBy(s => s.Keyword, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => (IReadOnlyList<KeywordSuppression>)g.ToList(), StringComparer.OrdinalIgnoreCase),
-            KeywordMatcher.For(lookup.Keys, conflicts));
+            KeywordMatcher.For(lookup.Keys));
     }
 
     public static KeywordTarget Page(string keyword, string url = "/target/", Guid? key = null) =>
-        new(keyword, key ?? OtherPageKey, url, "Target", KeywordSource.Tag);
+        new(keyword, key ?? OtherPageKey, url, "Target", KeywordSource.Manual);
 
     public static KeywordTarget External(string keyword, string url, string? rel = "nofollow") =>
         new(keyword, Guid.Empty, url, "example.com", KeywordSource.External, rel);

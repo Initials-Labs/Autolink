@@ -4,12 +4,12 @@ using Microsoft.Extensions.DependencyInjection;
 using OC.AutoLink.Api;
 using OC.AutoLink.Caching;
 using OC.AutoLink.Api.Security;
-using OC.AutoLink.Install;
 using OC.AutoLink.Linking;
 using OC.AutoLink.Notifications;
 using OC.AutoLink.Persistence;
 using OC.AutoLink.PropertyEditors;
 using OC.AutoLink.Registry;
+using OC.AutoLink.Relations;
 using OC.AutoLink.Scanning;
 using OC.AutoLink.Uninstall;
 using Umbraco.Cms.Core;
@@ -33,6 +33,7 @@ public sealed class AutoLinkComposer : IComposer
         builder.Services.AddSingleton<IKeywordMappingStore, KeywordMappingStore>();
         builder.Services.AddSingleton<IKeywordSuppressionStore, KeywordSuppressionStore>();
         builder.Services.AddSingleton<IAutoLinkScanner, AutoLinkScanner>();
+        builder.Services.AddSingleton<IAutoLinkRelationWriter, AutoLinkRelationWriter>();
         builder.Services.AddSingleton<IAutoLinkUninstaller, AutoLinkUninstaller>();
         builder.Services.AddSingleton<IKeywordRegistry, KeywordRegistry>();
         builder.Services.AddSingleton<IAutoLinker, AutoLinker>();
@@ -71,9 +72,17 @@ public sealed class AutoLinkComposer : IComposer
         builder.PropertyValueConverters()
             .Replace<RteBlockRenderingValueConverter, AutoLinkRichTextValueConverter>();
 
+        // One startup handler, two plans: the decision tables, and the optional keyword schema. See
+        // AutoLinkMigrationHandler for why the second is conditional.
         builder
             .AddNotificationHandler<ContentCacheRefresherNotification, KeywordRegistryInvalidationHandler>()
-            .AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, AutoLinkMigrationHandler>()
-            .AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, AutoLinkSchemaInstaller>();
+            .AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, AutoLinkMigrationHandler>();
+
+        // Warns before a page other pages auto-link to is deleted, and clears the relations once it is gone. The
+        // warning in the delete dialog itself comes from Umbraco, off the back of the dependency relation type.
+        builder
+            .AddNotificationHandler<ContentMovingToRecycleBinNotification, AutoLinkRelationHandler>()
+            .AddNotificationHandler<ContentDeletingNotification, AutoLinkRelationHandler>()
+            .AddNotificationHandler<ContentDeletedNotification, AutoLinkRelationHandler>();
     }
 }

@@ -226,34 +226,34 @@ public sealed class AutoLinker : IAutoLinker
 
             if (!set.Targets.TryGetValue(match.Value, out KeywordTarget? target))
             {
-                // No target: either contested, or a keyword only in the matcher to reserve its span.
-                Report(placements, state, options, null, match.Value, ContestedKeyword(set, match.Value), AutoLinkSkipReason.Contested);
+                // Unreachable in practice: the matcher is built from the resolved keywords and nothing else. It
+                // stays because the alternative to a mismatch between the two is a null reference mid-render.
                 continue;
             }
 
             if (forcedSkipReason is not null)
             {
-                Report(placements, state, options, target, match.Value, target.Keyword, forcedSkipReason);
+                Report(placements, state, options, target, match.Value, forcedSkipReason);
                 continue;
             }
 
             if (pageFull)
             {
-                Report(placements, state, options, target, match.Value, target.Keyword, AutoLinkSkipReason.LimitReached);
+                Report(placements, state, options, target, match.Value, AutoLinkSkipReason.LimitReached);
                 continue;
             }
 
             // Never link a page to itself.
             if (currentPageKey is not null && target.TargetKey == currentPageKey.Value)
             {
-                Report(placements, state, options, target, match.Value, target.Keyword, AutoLinkSkipReason.SelfLink);
+                Report(placements, state, options, target, match.Value, AutoLinkSkipReason.SelfLink);
                 continue;
             }
 
             // The editor already linked to this target somewhere in this property.
             if (existingHrefs.Contains(target.Url))
             {
-                Report(placements, state, options, target, match.Value, target.Keyword, AutoLinkSkipReason.HandLinked);
+                Report(placements, state, options, target, match.Value, AutoLinkSkipReason.HandLinked);
                 continue;
             }
 
@@ -286,7 +286,7 @@ public sealed class AutoLinker : IAutoLinker
             // Budget check last, so a rejected candidate does not burn the keyword's single allowance.
             if (state.CountFor(target.Keyword) >= options.MaxLinksPerKeyword)
             {
-                Report(placements, state, options, target, match.Value, target.Keyword, AutoLinkSkipReason.LimitReached);
+                Report(placements, state, options, target, match.Value, AutoLinkSkipReason.LimitReached);
                 continue;
             }
 
@@ -349,41 +349,32 @@ public sealed class AutoLinker : IAutoLinker
         List<AutoLinkPlacement>? placements,
         AutoLinkRequestState state,
         AutoLinkOptions options,
-        KeywordTarget? target,
+        KeywordTarget target,
         string matchedText,
-        string? keyword,
         string reason)
     {
-        if (placements is null || keyword is null)
+        if (placements is null)
         {
             return;
         }
 
-        if (state.ReportsFor(keyword, reason) >= options.MaxLinksPerKeyword)
+        if (state.ReportsFor(target.Keyword, reason) >= options.MaxLinksPerKeyword)
         {
             return;
         }
 
         placements.Add(new AutoLinkPlacement(
-            keyword,
+            target.Keyword,
             matchedText,
-            target?.TargetKey,
-            target?.TargetName,
-            target?.Url,
+            target.TargetKey,
+            target.TargetName,
+            target.Url,
             SuppressedPageKey: null,
             SuppressedCulture: null,
             reason));
 
-        state.RecordReport(keyword, reason);
+        state.RecordReport(target.Keyword, reason);
     }
-
-    /// <summary>
-    /// The canonical spelling of a contested keyword, or null when the match belongs to no keyword at all.
-    /// </summary>
-    private static string? ContestedKeyword(CultureKeywordSet set, string matchedText) =>
-        set.Conflicts
-            .FirstOrDefault(c => string.Equals(c.Keyword, matchedText, StringComparison.OrdinalIgnoreCase))
-            ?.Keyword;
 
     private static AutoLinkPlacement ToPlacement(
         KeywordTarget target,

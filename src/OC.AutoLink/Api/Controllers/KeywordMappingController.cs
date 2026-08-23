@@ -8,11 +8,19 @@ using OC.AutoLink.Registry;
 namespace OC.AutoLink.Api.Controllers;
 
 /// <summary>
-/// The mapping screen's backend. Reads straight off the registry snapshot, so what the screen offers is exactly
-/// what the renderer considered — no second query that could disagree with it.
+/// The keywords screen's backend.
 /// </summary>
+/// <remarks>
+/// Rows come from the store and their destinations from the registry snapshot, so what the screen shows is exactly
+/// what the renderer resolved — no second lookup that could disagree with it. A row the registry could not resolve
+/// is still returned, marked unresolved, because a keyword pointing at a deleted page is the one thing on this
+/// screen that needs somebody to do something.
+/// </remarks>
 public sealed class KeywordMappingController : AutoLinkControllerBase
 {
+    /// <summary>Matches the column width, so an over-long keyword is a 400 rather than a database error.</summary>
+    private const int MaxKeywordLength = 255;
+
     private readonly IKeywordRegistry _registry;
     private readonly IKeywordMappingStore _store;
 
@@ -23,7 +31,7 @@ public sealed class KeywordMappingController : AutoLinkControllerBase
     }
 
     /// <summary>
-    /// Every keyword the registry knows about, per culture, contested ones first.
+    /// Every keyword, per culture.
     /// </summary>
     [HttpGet("keywords")]
     [ProducesResponseType(typeof(KeywordOverviewResponseModel), StatusCodes.Status200OK)]
@@ -50,19 +58,13 @@ public sealed class KeywordMappingController : AutoLinkControllerBase
         CultureKeywordSet set,
         IReadOnlyList<KeywordMapping> allMappings)
     {
-        // The same precedence the registry resolves with, so the screen cannot disagree with the renderer.
+        // The same precedence the registry resolves with, so the screen cannot disagree with the renderer about
+        // which row is in force for this language.
         Dictionary<string, KeywordMapping> mappings = KeywordMapping.InForce(allMappings, culture);
 
-        var conflicted = new HashSet<string>(
-            set.Conflicts.Select(c => c.Keyword),
-            StringComparer.OrdinalIgnoreCase);
-
-        IEnumerable<string> keywords = set.Targets.Keys
-            .Union(set.Candidates.Keys, StringComparer.OrdinalIgnoreCase);
-
-        List<KeywordRowResponseModel> rows = keywords
-            .Select(keyword => BuildRow(keyword, set, mappings, conflicted))
-            .OrderByDescending(row => row.HasConflict)
+        List<KeywordRowResponseModel> rows = mappings.Values
+            .Select(mapping => BuildRow(mapping, set))
+            .OrderByDescending(row => row.Source == "unresolved")
             .ThenBy(row => row.Keyword, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
@@ -70,14 +72,35 @@ public sealed class KeywordMappingController : AutoLinkControllerBase
         {
             Culture = culture,
             Total = rows.Count,
-            Conflicts = set.Conflicts.Count,
-            Manual = rows.Count(r => r.Source == "manual"),
+            Unresolved = rows.Count(row => row.Source == "unresolved"),
+            External = rows.Count(row => row.Source == "external"),
             Keywords = rows,
         };
     }
 
+    private static KeywordRowResponseModel BuildRow(KeywordMapping mapping, CultureKeywordSet set)
+    {
+        set.Targets.TryGetValue(mapping.Keyword, out KeywordTarget? target);
+
+        return new KeywordRowResponseModel
+        {
+            Keyword = mapping.Keyword,
+            Source = target is null ? "unresolved" : target.Source.ToString().ToLowerInvariant(),
+            TargetKey = mapping.IsExternal ? null : mapping.TargetKey,
+            TargetName = target?.TargetName,
+            Url = target?.Url,
+            ExternalUrl = mapping.ExternalUrl,
+            Label = mapping.Label,
+            Nofollow = mapping.Nofollow,
+            UpdateDate = mapping.UpdateDate,
+            UpdatedBy = mapping.UpdatedBy,
+            MappingCulture = mapping.Culture,
+        };
+    }
+
     /// <summary>
-    /// Pins a keyword to a page. Replaces any existing decision for that keyword.
+    /// Creates a keyword, or points an existing one somewhere else. One row per keyword per culture, so saving the
+    /// same keyword again replaces where it goes rather than adding a second destination.
     /// </summary>
     [HttpPut("mapping")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -86,14 +109,19 @@ public sealed class KeywordMappingController : AutoLinkControllerBase
     {
         if (string.IsNullOrWhiteSpace(model.Keyword))
         {
-            return BadRequest("A mapping needs a keyword.");
+            return BadRequest("A keyword is needed.");
+        }
+
+        if (model.Keyword.Trim().Length > MaxKeywordLength)
+        {
+            return BadRequest($"A keyword cannot be longer than {MaxKeywordLength} characters.");
         }
 
         bool wantsExternal = !string.IsNullOrWhiteSpace(model.ExternalUrl);
 
         if (wantsExternal == (model.TargetKey != Guid.Empty))
         {
-            return BadRequest("A mapping needs either a page or an external URL, not both and not neither.");
+            return BadRequest("A keyword needs either a page or an external URL, not both and not neither.");
         }
 
         KeywordDestination destination;
@@ -120,7 +148,7 @@ public sealed class KeywordMappingController : AutoLinkControllerBase
     }
 
     /// <summary>
-    /// Hands a keyword back to automatic resolution. If it is contested, it goes back to being a conflict.
+    /// Removes a keyword. Nothing links it afterwards — there is no second source for it to fall back to.
     /// </summary>
     /// <remarks>Idempotent, for the same reason as lifting a suppression.</remarks>
     [HttpDelete("mapping")]
@@ -129,47 +157,11 @@ public sealed class KeywordMappingController : AutoLinkControllerBase
     {
         if (string.IsNullOrWhiteSpace(keyword))
         {
-            return BadRequest("A mapping needs a keyword.");
+            return BadRequest("A keyword is needed.");
         }
 
         bool removed = _store.Delete(keyword, culture ?? string.Empty);
 
         return Ok(new { removed });
-    }
-
-    private static KeywordRowResponseModel BuildRow(
-        string keyword,
-        CultureKeywordSet set,
-        Dictionary<string, KeywordMapping> mappings,
-        HashSet<string> conflicted)
-    {
-        set.Targets.TryGetValue(keyword, out KeywordTarget? target);
-
-        IReadOnlyList<KeywordCandidate> candidates =
-            set.Candidates.TryGetValue(keyword, out IReadOnlyList<KeywordCandidate>? claimants)
-                ? claimants
-                : [];
-
-        mappings.TryGetValue(keyword, out KeywordMapping? mapping);
-
-        return new KeywordRowResponseModel
-        {
-            Keyword = keyword,
-            Source = target is null ? "unresolved" : target.Source.ToString().ToLowerInvariant(),
-            HasConflict = conflicted.Contains(keyword),
-            TargetKey = target?.TargetKey,
-            TargetName = target?.TargetName,
-            Url = target?.Url,
-            UpdateDate = mapping?.UpdateDate,
-            UpdatedBy = mapping?.UpdatedBy,
-            MappingCulture = mapping?.Culture,
-            Candidates = candidates.Select(c => new KeywordCandidateResponseModel
-            {
-                TargetKey = c.TargetKey,
-                TargetName = c.TargetName,
-                Url = c.Url,
-                IsSelected = target is not null && target.TargetKey == c.TargetKey,
-            }),
-        };
     }
 }

@@ -103,7 +103,7 @@ public class ResolutionTests
         KeywordSuppression page = TestLinker.Suppression("hello", Page, "en-GB");
         KeywordSuppression global = TestLinker.Suppression("hello", Guid.Empty);
 
-        CultureKeywordSet set = TestLinker.Set([TestLinker.Page("hello")], [], [global, page]);
+        CultureKeywordSet set = TestLinker.Set([TestLinker.Page("hello")], [global, page]);
 
         KeywordSuppression? found = set.FindSuppression("hello", Page);
 
@@ -116,7 +116,7 @@ public class ResolutionTests
     public void A_global_row_suppresses_a_page_that_has_no_row_of_its_own()
     {
         CultureKeywordSet set = TestLinker.Set(
-            [TestLinker.Page("hello")], [], [TestLinker.Suppression("hello", Guid.Empty)]);
+            [TestLinker.Page("hello")], [TestLinker.Suppression("hello", Guid.Empty)]);
 
         Assert.True(set.IsSuppressed("hello", Page));
         Assert.Equal(Guid.Empty, set.FindSuppression("hello", Page)!.PageKey);
@@ -126,7 +126,7 @@ public class ResolutionTests
     public void A_page_row_does_not_suppress_a_different_page()
     {
         CultureKeywordSet set = TestLinker.Set(
-            [TestLinker.Page("hello")], [], [TestLinker.Suppression("hello", Page)]);
+            [TestLinker.Page("hello")], [TestLinker.Suppression("hello", Page)]);
 
         Assert.False(set.IsSuppressed("hello", Target));
         Assert.Null(set.FindSuppression("hello", Target));

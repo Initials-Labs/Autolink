@@ -21,6 +21,13 @@ All three spikes pass. Evidence below is from the Clean starter kit site in `Aut
 | 5 | Do tags, keywords and decisions work per language on a multilingual site? | **Pass** |
 | 6 | Can a keyword point somewhere outside the site, per language? | **Pass** |
 
+> **Keywords have since moved off document types entirely.** Spikes 1, 3 and 5 were built on a `linkKeywords` Tags
+> property on every target page, and that property is gone: keywords live in the package's own table and are edited
+> on the Auto-linking screen, with Umbraco's Multi URL Picker choosing between a page and an outside URL. What the
+> spikes proved still holds — render-time substitution, nesting inside blocks, retroactivity, per-language keywords —
+> but the evidence below that mentions tagging a page describes how it used to be reached. See
+> [Keywords moved to the dashboard](#11-keywords-moved-to-the-dashboard).
+
 ### Why Spike 0 was a strong test here
 
 Clean has **no top-level RTE property on `article` at all**. Every piece of article body copy is
@@ -72,13 +79,21 @@ not delegating it would have silently regressed it rather than leaving it alone.
 `KeywordRegistry` is a singleton holding a `KeywordSnapshot`: the keyword to target lookup, one compiled
 `Regex`, and a content stamp.
 
-`ITagQuery.GetContentByTagGroup(group)` returns `IEnumerable<IPublishedContent>` straight off the published
-cache. That collapsed what the design doc listed as two separate unknowns — the tags query API and URL
-resolution outside a request context — into a single call. URLs are resolved once at build time via
-`IPublishedUrlProvider`, since resolution is most of the build cost.
+Keywords come from one place: the rows in `ocAutoLinkKeywordMapping`. A row names a keyword, a culture, and
+either a page key or an absolute URL. There is no second source, which is what makes the whole build a loop over
+rows rather than a reconciliation between two of them.
 
-`ITagQuery` is **scoped**, so the singleton registry resolves it from a fresh `IServiceScope` per rebuild
-rather than holding one.
+URLs are resolved once at build time via `IPublishedUrlProvider`, since resolution is most of the build cost, and
+`GetUrl(Guid, ...)` takes a key directly — which keeps the build synchronous, `IPublishedContentCache` being
+async-only in v17.
+
+Target **names** cost one query for the whole rebuild. `IContentService.GetByIds` is called once with every key any
+row points at, and the per-culture name comes off `IContentBase.GetCultureName(culture)` with `Name` as the fallback
+for a page whose type does not vary. That query exists because the tags query used to hand back published content
+with its name already attached; without it, a name would have been a database round trip per keyword per culture.
+
+The stores and Umbraco's services here are **scoped**, so the singleton registry resolves them from a fresh
+`IServiceScope` per rebuild rather than holding one.
 
 The matcher is a single alternation sorted longest first, so `content editor` beats `editor`. Word boundaries
 are applied **per keyword**, not around the whole group — `\b` only does the right thing next to a word
@@ -123,84 +138,70 @@ Rules enforced:
 the `IPublishedElement owner` handed to the converter is the *block's* element — it has no Id and no Url, so
 self-link detection cannot use it. (`IPropertyRenderingContextAccessor`, new in 17, only carries `Fallback`.)
 
-### 5. Collisions and manual mapping
+### 5. One keyword, one destination
 
-Two pages tagged with the same keyword used to be resolved by whichever the tags query happened to return
-first, and the loser was dropped silently. Nothing anywhere recorded that a second claimant existed.
+A keyword has **one row per culture, and a row has one destination**. The unique index on
+`(keywordKey, culture)` is what enforces it, so two pages cannot claim the same phrase and there is nothing for the
+code to arbitrate. Resolution is a lookup, not a contest:
 
-`Build()` now collects **every** page claiming each keyword and resolves in precedence order:
+| Source | Meaning |
+|---|---|
+| `Manual` | The row names a page, and that page is routable in this culture |
+| `External` | The row names an absolute http or https URL |
+| *unresolved* | The row names something that will not resolve here |
 
-| Precedence | Source | When |
-|---|---|---|
-| 1 | `Manual` | A stored mapping names a target |
-| 2 | `Tag` | Exactly one page claims the keyword |
-| 3 | *unresolved* | Two or more claim it and nothing settles it |
+A row stores the **page key, not its URL**, so a page that later moves or gets renamed still resolves and the move
+shows up in the stamp. Several keywords may point at the same page, which is how synonyms and plurals are expressed.
 
-Unresolved keywords are **left out of the matcher entirely**, so the phrase renders as plain text and lands in
-`KeywordSnapshot.Conflicts`. That is a deliberate change from first-past-the-post: a confidently wrong link is
-worse than no link, and an unlinked keyword is what sends somebody to the mapping screen to make the call.
+**An unresolved keyword is left out of the matcher entirely** and reported on the screen. There used to be a fallback
+here — a mapping whose target had gone fell back to whatever the tags said — and with the tags gone there is nothing
+to fall back to, which is an improvement rather than a loss: the keyword stops linking, loudly, instead of quietly
+linking somewhere nobody chose. The three ways a row goes unresolved are a deleted page, a page unpublished or never
+published in this language, and a stored URL that is not absolute http or https.
 
-Candidate lists are sorted by URL, so the backoffice list does not shuffle between rebuilds.
-
-**A contested keyword stays in the matcher even though it resolves to nothing**, so it still claims its span.
-`Regex.Matches` is non-overlapping and the alternation is longest first, so this stops a shorter keyword matching
-inside the contested phrase. Without it, dropping `content editor` for being contested let `editor` link the same
-words to `/about/` — a third page that was never a candidate, and a worse answer than either of the two the code
-had just declined to choose between. Declining to guess has to mean leaving the phrase alone, not handing it to
-the next bidder.
-
-A mapping stores the **target key, not its URL**, so a mapped page that later moves still resolves and the move
-shows up in the stamp. A mapping may also name a page that carries **no tag at all**, which is how a synonym or a
-plural could be pointed at a hub page without polluting that page's tag list — though the screen no longer offers
-that: a free page picker made it impossible to tell at a glance whether a keyword was linked because of a tag or
-because somebody had picked a page, which was the main source of confusion. The store still supports it, so a
-mapping created another way keeps working and the screen reports it as chosen by hand. Those are resolved through
-`IPublishedUrlProvider.GetUrl(Guid)` — it takes a key directly, which keeps the build synchronous, since
-`IPublishedContentCache` is async-only in v17 and the registry build is not.
-
-A mapping whose target has since been deleted or unpublished falls back to automatic resolution and logs a
-warning, rather than dropping the keyword.
-
-The stamp now hashes the candidate set as well as the resolved targets. A third page joining an existing
-two-page conflict changes no output, but the backoffice still needs to see it, and without it in the hash the
-snapshot would not swap.
+Unresolved keywords do **not** reserve their span, and suppressed ones do. That distinction is deliberate. A
+suppressed keyword resolves fine and is being held back on purpose, so it stays in the matcher and keeps its words —
+otherwise switching `content editor` off would let `editor` link the same phrase somewhere nobody chose. An
+unresolved keyword is a broken row to repair, not a decision to hold ground for.
 
 ### 6. Storage, API and backoffice section
 
-`ocAutoLinkKeywordMapping`, created by a real `MigrationPlan` (`AutoLinkMigrationPlan`) rather than the
-startup-fixup approach the Tags datatype installer uses — the table holds editorial decisions, so it is not
-something to recreate opportunistically. The keyword is stored twice: `keywordKey` lower-cased carrying the
-unique index, so uniqueness behaves the same on SQLite (case-sensitive text by default) as on SQL Server, and
-`keyword` preserving the casing somebody typed for display.
+`ocAutoLinkKeywordMapping`, created by a real `MigrationPlan` (`AutoLinkMigrationPlan`) rather than a startup
+fixup — the table is where the keywords live, so it is not something to recreate opportunistically. The keyword is
+stored twice: `keywordKey` lower-cased carrying the unique index, so uniqueness behaves the same on SQLite
+(case-sensitive text by default) as on SQL Server, and `keyword` preserving the casing somebody typed for display.
 
-If the table is missing, `KeywordMappingStore.GetAll()` logs and returns empty, so a failed migration degrades
-to automatic resolution instead of taking the whole registry down.
+If the table is missing, `KeywordMappingStore.GetAll()` logs and returns empty, so a failed migration renders a site
+that behaves as though the package were not installed rather than taking requests down with it.
 
 ```
-GET    /umbraco/management/api/v1/autolink/keywords   rows, contested first, with every candidate
-PUT    /umbraco/management/api/v1/autolink/mapping    { keyword, targetKey }
-DELETE /umbraco/management/api/v1/autolink/mapping    ?keyword=...
+GET    /umbraco/management/api/v1/autolink/keywords   rows per culture, unresolved first
+PUT    /umbraco/management/api/v1/autolink/mapping    { keyword, culture, targetKey | externalUrl, label, nofollow }
+DELETE /umbraco/management/api/v1/autolink/mapping    ?keyword=...&culture=...
 ```
 
-The screen reads straight off the registry snapshot, so the options it offers are exactly the ones the renderer
-considered. No second query that could disagree with it.
+Rows come from the store and their destinations from the registry snapshot, so what the screen shows is what the
+renderer resolved. No second query that could disagree with it. A row the registry could not resolve is still
+returned, marked unresolved, because that is the one thing on the screen anybody has to act on.
 
 **One screen, organised by keyword.** The first attempt had two dashboards, one for choosing link destinations and
 one auditing where links appeared. Both were keyed on keyword, so it was never obvious which direction a table was
 showing — the pages listed under a keyword were its *targets* on one screen and the pages *mentioning* it on the
-other. A keyword only means anything as the pair, so each one is now a card with both halves spelled out:
+other. A keyword only means anything as the pair, so it is one row with both halves in columns and the detail
+underneath:
 
 ```
-harrie                                            [needs a decision]
-  LINKS TO      nothing yet
-  TAGGED ON     Features /us/features/   [Link to this one]
-                About    /us/about/      [Link to this one]
-  MENTIONED ON  About /us/about/  reads "harrie"  [off here] [Allow here]
+KEYWORD          LINKS TO                              MENTIONS
+harrie           About  /us/about/                      2 linked  1 not linked
+  Set for en-US by admin@example.com.   [Change destination] [Remove keyword]
+  MENTIONED ON 3 PAGES
+    About     /us/about/     not linked: this page is the one the keyword points at.
+    Features  /us/features/  linked                     [Do not link here]
 ```
 
-"Links to" and "Tagged on" are the destination; "Mentioned on" is where the link actually renders. The keyword list
-and the scan are both fetched on load and pivoted by keyword in the browser, which keeps each endpoint independently
-useful and costs one extra request.
+"Links to" is the destination; "Mentions" is where the link actually renders. The keyword list and the scan are both
+fetched on load and pivoted by keyword in the browser, which keeps each endpoint independently useful and costs one
+extra request.
 
 The UI is one plain ESM file, no build step: the backoffice ships an import map, so bare
 `@umbraco-cms/backoffice/...` specifiers resolve at runtime. Static web assets are served from source in
@@ -260,7 +261,6 @@ keyword three times, appear once, and there was nothing to say why. Each skipped
 | `hand-linked` | The editor already linked to that target in this property |
 | `skipped-element` | The mention sits in a heading, an anchor, code |
 | `limit` | The per-keyword or per-page allowance was already spent |
-| `contested` | More than one page claims the keyword, so nothing resolves |
 | `suppressed` | Held back by an editorial decision |
 
 Rendering still skips text inside headings and anchors without looking at it. An audit looks anyway, so it can say
@@ -291,7 +291,8 @@ post: the report showed two rows where the site was actually linking on ten.
 different things on SQL Server and SQLite.
 
 Suppressed keywords stay resolved in `Targets` and stay in the matcher, so they keep reserving their span. Switching
-one off cannot let a shorter keyword hijack the phrase — the same reasoning as contested keywords above.
+one off cannot let a shorter keyword hijack the phrase — see [One keyword, one destination](#5-one-keyword-one-destination)
+for why an unresolved keyword is treated the other way round.
 
 **A placement names the suppression row in force**, by page key and culture, rather than carrying flags that
 describe it. Flags were the first design and they were a bug: `SuppressedAllCultures` was computed per keyword, so a
@@ -303,7 +304,7 @@ Lifting picks the narrowest matching row: this page in this culture, then this p
 page in this culture, then every page for all cultures. A keyword switched off both on one page and everywhere stays
 suppressed after the page row goes, which is the truth rather than an action that appears to do nothing.
 
-**Both deletes are idempotent.** Lifting a suppression or clearing a mapping that is not there returns success, since
+**Both deletes are idempotent.** Lifting a suppression or removing a keyword that is not there returns success, since
 the state the caller asked for already holds. They used to return 404, which made a scope mismatch look like an error
 an editor could not clear.
 
@@ -315,7 +316,7 @@ keyword suppressed on a page mentioning it five times produced five rows where l
 
 A site with two languages has two keyword sets. `hello` and `bonjour` point at the same page, but through different
 URLs, and each is only meaningful in its own language. So the snapshot is **one `CultureKeywordSet` per configured
-language, plus one invariant set**, each with its own targets, candidates, conflicts, suppressions and matcher.
+language, plus one invariant set**, each with its own targets, suppressions and matcher.
 `KeywordSnapshot.For(culture)` picks one, falling back to the invariant set.
 
 The renderer takes the culture from `IVariationContextAccessor.VariationContext.Culture`, which is what Umbraco sets
@@ -323,25 +324,27 @@ from the request, with `PublishedRequest.Culture` as a fallback. The scan iterat
 sets the variation context per culture before reading values, because rich text nested in a block has no per-call
 culture argument to pass.
 
-Both decision tables carry a `culture` column. A keyword contested in `en-US` is a separate editorial decision from
-the same word in `en-GB`, so mappings and suppressions are keyed per culture, with an **empty culture meaning every
-culture** — which is what a decision made before the site went multilingual meant. Culture-specific rows win over
-all-culture ones.
+Both tables carry a `culture` column. The same word in `en-US` is a separate keyword from the one in `en-GB`, so rows
+are keyed per culture, with an **empty culture meaning every culture** — which is what a keyword added before the site
+went multilingual meant. Culture-specific rows win over all-culture ones.
 
-Invariant tags are merged into every culture's set, so a site where some target doctypes vary and others do not
-resolves both. Targets that are not published in the culture being rendered fall out for free: `GetUrl` returns `#`
-for them and the existing routability check drops them, so a French page never links to an English-only target.
+An all-culture row is resolved separately for each language, so one row pointing at a page gives an `/us/` URL in
+`en-US` and a bare one in `en-GB` without anybody duplicating it. Pages not published in the culture being rendered
+fall out for free: `GetUrl` returns `#` and the routability check drops them, so an `en-GB` page never links to a
+target that only exists in `en-US` — it reports as unresolved in that language instead.
 
-#### The two traps
+#### The trap
 
-- **The culture-free tags query returns nothing once the property varies.** `GetContentByTagGroup(group)` with no
-  culture found six keywords before the property was set to vary by culture and **zero** afterwards, while
-  `GetContentByTagGroup(group, "en-US")` returned them correctly. Nothing errors: the registry simply goes quiet and
-  every tag-driven link on the site disappears. This is the single most important thing to know here.
-- **Umbraco's migration layer refuses `ALTER TABLE` on SQLite outright** — the exception says so in as many words —
-  so `Alter.Table().AddColumn()` cannot add the culture column. `AddCultureToDecisions` reads the rows out, drops the
-  table, recreates it from the DTO (which brings the new column and rebuilt unique index with it) and puts the rows
-  back. Portable across providers, and lossless.
+**Umbraco's migration layer refuses `ALTER TABLE` on SQLite outright** — the exception says so in as many words — so
+`Alter.Table().AddColumn()` cannot add the culture column. `AddCultureToDecisions` reads the rows out, drops the table,
+recreates it from the DTO (which brings the new column and rebuilt unique index with it) and puts the rows back.
+Portable across providers, and lossless.
+
+> The other trap here used to be the one that mattered most: `ITagQuery.GetContentByTagGroup(group)` with no culture
+> argument returns **nothing** once the keyword property varies by culture, so every tag-driven link on the site
+> vanished silently the day it was set to vary. It cost most of a day to find, it is why the snapshot is per culture
+> at all, and it no longer applies — the tags query is gone. Recorded because the shape of the failure is worth
+> remembering: nothing errored, and the property went on showing the keywords in the content editor the whole time.
 
 ### 10. External links
 
@@ -352,7 +355,7 @@ destination is a node or a URL.
 
 Everything downstream therefore needed no special casing:
 
-- **Precedence** is unchanged — hand-made choice beats an uncontested tag beats contested.
+- **Precedence** needed nothing: the row is the destination either way.
 - **Cultures** come free from the column already on the row, so an external link can be per language or for all of
   them, and a keyword can point at different URLs in different languages.
 - **Suppression, the audit, mention accounting and the caps** all work untouched, because they operate on resolved
@@ -362,8 +365,10 @@ Everything downstream therefore needed no special casing:
 - **Self-linking** stops applying, since there is no node identity to compare. Nothing needed changing; an external
   target carries an empty key, which never matches a real page.
 
-What is genuinely new is that **the dashboard creates keywords** rather than only resolving them. Every other keyword
-originates from a tag; an external link has no page to tag, so the keyword is typed into the screen.
+What was genuinely new at the time is that **the dashboard creates keywords** rather than only resolving them. Every
+other keyword originated from a tag; an external link had no page to tag, so it had to be typed into the screen. That
+turned out to be the interesting half: once the screen could create a keyword, the tags had nothing left to do. See
+[Keywords moved to the dashboard](#11-keywords-moved-to-the-dashboard).
 
 #### Validation is a security boundary here
 
@@ -385,11 +390,105 @@ globally with `ExternalLinkRel` and overridable per link for a domain worth pass
 marker is a **second attribute** rather than a different value for `data-autolink`, so anything already keying on the
 original attribute keeps working. No `target="_blank"`: that is the visitor's choice to make.
 
+### 11. Keywords moved to the dashboard
+
+The `linkKeywords` Tags property is gone. Keywords are created on the Auto-linking screen, and the destination is
+Umbraco's **Multi URL Picker** — `umb-input-multi-url`, the input behind `Umbraco.MultiUrlPicker` — capped at one
+item, which is how core itself does a single-link picker.
+
+The argument for it is the one external links exposed. A tag says "this page answers to this phrase", which reads
+well until you want a synonym, a plural, a phrase whose best target carries no tag, or a destination that is not a
+page at all. Every one of those wanted a row in the table instead, so the table was already the real answer and the
+tags were a second way in that could disagree with it. Now there is one place a keyword can come from, and picking a
+page and typing a URL are the same act performed in the same control.
+
+What that deleted:
+
+| Gone | Why it could go |
+|---|---|
+| `ITagQuery` lookup, `CollectCandidates` | Rows are the only source |
+| `KeywordCandidate`, `KeywordConflict` | A unique `(keywordKey, culture)` index cannot hold two destinations |
+| `AutoLinkSkipReason.Contested`, `KeywordSource.Tag` | Nothing can be contested, and nothing comes from a tag |
+| Conflict reservation in `KeywordMatcher` | No keyword resolves to nothing on purpose any more |
+| `TagGroup`, `KeywordsPropertyAlias` config | Nothing reads a tag group or a property alias |
+| The Tags datatype installer | Only the scan opt-out property is installed now |
+| The dashboard's "choose one of these pages" panel | Replaced by "change destination" on every row |
+
+`excludeFromAutoLinking` **stayed on the document type**, which is the one thing here that genuinely belongs on a
+page: it says "do not scan *this page's* copy", which is a property of the page and not of any keyword.
+
+Three consequences worth being explicit about:
+
+- **Creating a target is now two steps, not one.** Tagging a page made it a target in the same save. Now you publish
+  the page and add the keyword on the screen. Retroactivity is untouched — an article written months ago picks the
+  link up on its next render, which was always the point — but the work moved from the content editor to one central
+  screen, which is the trade being made deliberately.
+- **A broken destination stops linking instead of falling back.** There is no tag left to fall back to, so a keyword
+  whose page has gone reports as unresolved and links nothing. Those rows sort first and open themselves.
+- **Teardown is more destructive than it was.** These tables used to hold decisions layered over tags; they now hold
+  the keywords themselves. `DELETE /autolink/data` takes the lot.
+
+The picker offers three things the linker has no concept of. The anchor field is hidden (`hide-anchor`). A **media**
+pick is refused as it is made, with a message saying so, because a media URL is site-relative and
+`ExternalUrl.TryNormalise` insists on absolute http or https on purpose — that check is a security boundary, and
+loosening it so a keyword can point at a PDF is not a trade worth making here. **Open in new window** cannot be
+hidden at all, on `umb-input-multi-url` or on the built-in property editor, so ticking it prints a line saying
+auto-links will not use it. Dropping editor input silently is the thing being avoided in all three cases.
+
+### 12. Relations, and warning before a linked page is deleted
+
+Keywords made it easy to break a page without noticing: delete the page a keyword points at and every auto-link to
+it silently stops, which is the flip side of decision 1 working as designed. Umbraco already has the machinery to
+warn about that — it just needs telling.
+
+`ocAutoLinkKeyword` is a relation type with **`isDependency: true`**, created by a migration on the main plan. That
+one flag is the whole feature: Umbraco's tracked references read dependency relations, so the Info tab grows a
+"Referenced by" list and the delete confirmation grows **"The following items depend on this"**, naming the pages
+that would lose links. No UI of ours involved.
+
+**The direction is the part to get right, and it is the opposite of the obvious reading.** Umbraco stores a
+reference with the *referencing* item as the parent: a Content Picker on page A pointing at page B is
+`parent=A, child=B`, and "what uses this item" is a lookup on `childId`. Written the intuitive way round —
+target as parent — the relations exist, the database looks reasonable, and the warning fires on the *mentioning*
+pages instead of on the target. That is exactly backwards from the case worth warning about, and the only symptom
+is an empty "Referenced by" panel on the page that has five things pointing at it. Confirmed against Clean's own
+`umbDocument` rows before settling it.
+
+Relations are reconciled from the **scan**, not written as pages render:
+
+- Only mentions that actually became links count. One sitting in a heading, one past the per-page cap, or one
+  switched off by hand renders no anchor, so recording it would make the warning claim links that are not there.
+- External links are skipped — there is no node to relate to.
+- Pairs are deduplicated across cultures, since `umbracoRelation` has no culture column.
+- The reconcile is a set difference, so it is self-healing: rows that no longer hold are deleted, missing ones
+  added. That is what repaired the whole table after the direction was corrected.
+
+It runs off the back of `GET /scan`, which the dashboard calls on load. A read with a write behind it is not
+lovely, and the honest trade is that the scan is the only thing that knows the answer and already walks every
+published page; the alternative is relations that go stale and a delete warning that lies. `POST /relations`
+does the same thing explicitly, for a scheduled job.
+
+**Deleting the page clears the relations, and Umbraco does that part itself.** It removes a node's relations
+during the delete, before `ContentDeletedNotification` fires — verified on 17.6.1, and not a database cascade:
+the foreign keys on `umbracoRelation` carry no `ON DELETE CASCADE`. The handler here is a backstop that finds
+nothing in the normal path, kept because a relation surviving by some other route would show up as a phantom
+dependency on whatever takes that node id next.
+
+One gap the relations cannot cover: a keyword pointing at a page **nothing currently mentions** has no relation
+behind it, so there is nothing for Umbraco to warn about. `AutoLinkRelationHandler` adds an `EventMessage` naming
+the keywords in that case. Whether the v14+ backoffice surfaces event messages from a package notification handler
+is **not verified** — the log warning it writes alongside definitely lands, and the dashboard flags the keyword as
+unresolved afterwards either way.
+
+Teardown drops the relation type and its relations along with the tables.
+
 ---
 
 ## Verified behaviour
 
-From the Clean site, `/blog/meetups/`:
+From the Clean site, `/blog/meetups/`. Runs marked **[tag era]** were taken when keywords came from a `linkKeywords`
+Tags property; the linking behaviour they demonstrate is unchanged, but "tag page X" is now "add a keyword on the
+screen pointing at page X", and the collision run describes a state the table can no longer reach.
 
 **Skips hand-authored links and headings.** The article contains `Umbraco Leeds` in two places:
 
@@ -401,8 +500,8 @@ From the Clean site, `/blog/meetups/`:
 <p><a href="/blog/community/" data-autolink="true" title="Community">Umbracians</a> is a monthly ...</p>
 ```
 
-**Retroactivity (Spike 2).** With no keywords registered the article renders plain. Tagging *other* pages and
-publishing them makes links appear on the next render of the article, which was never opened or saved:
+**Retroactivity (Spike 2).** [tag era] With no keywords registered the article renders plain. Tagging *other* pages
+and publishing them makes links appear on the next render of the article, which was never opened or saved:
 
 ```
 before        stamp=empty                    0 auto-links
@@ -425,8 +524,9 @@ after  unpublish   editor         -> /about/      (shorter keyword now wins)
 
 **No stemming.** `\bmeetup\b` correctly refuses to match inside "meetup**s**". Plurals need their own keyword.
 
-**Collisions (Spike 3).** `Features` and `Community` both tagged `content editor`, driven from the backoffice
-screen and confirmed on the front end:
+**Collisions (Spike 3).** [tag era, no longer reachable] `Features` and `Community` both tagged `content editor`,
+driven from the backoffice screen and confirmed on the front end. One row per keyword per culture now makes the
+contested state impossible to create, which is what retired this whole path:
 
 ```
 both tagged            content editor      conflict, not linked   stamp=506963caf4bfc145
@@ -488,8 +588,9 @@ allow both      stamp back to f860a91460904b0d, the pre-suppression value
 Three of those pages were ones nobody had thought to check, which is the argument for the scan being complete
 rather than driven by what has been visited. Every report row was verified against the rendered HTML.
 
-**Cultures (Spike 5).** Two languages, `en-US` default and `en-GB`, with `linkKeywords` set to vary by culture and
-one keyword tagged in `en-US` only:
+**Cultures (Spike 5).** [tag era] Two languages, `en-US` default and `en-GB`, with `linkKeywords` set to vary by
+culture and one keyword tagged in `en-US` only. Per-culture rows do the same job now, without depending on a property
+varying:
 
 ```
 tag store        en-US: harrie          en-GB: (none)
@@ -505,6 +606,23 @@ scan             25 scanned, 1 row: [en-US] /us/about/ harrie -> Features
 The decision applied to `en-US` and did not leak into `en-GB`, and URLs resolved through the `/us/` prefix
 throughout. Fully exercising `hello` versus `bonjour` needs an `en-GB` variant published with its own keyword, which
 is a content job rather than a code one.
+
+**Relations and the delete warning.** Against the Clean site, after a scan:
+
+```
+reconcile        5 added, 0 removed          Community <- Feetures, Popular blogs, Podcasts and
+                                             Videos, YouTube Tutorials, Join the Umbraco Community
+Info tab         "Referenced by" lists all five
+Trash Community  "The following items depend on this" + the five pages   <- cancelled, not deleted
+
+duplicate a mentioning page, publish it
+reconcile        1 added, 0 removed          6 rows, the copy now references Community
+delete the copy  relation gone, 5 rows       Umbraco cleared it during the delete; our handler found none
+```
+
+The first run of this had the direction inverted, which the database showed immediately: five rows reading
+`Community -> Feetures` and a "Referenced by" panel saying "This item has no references." Corrected, the reconcile
+removed all five and rewrote them the other way round with no intervention.
 
 **External links (Spike 6).** `Umbraco` pointed at `https://umbraco.com` in en-GB only:
 
@@ -546,8 +664,6 @@ is fast enough that a stamp-keyed `IAppPolicyCache` is not worth the complexity 
   "OC": {
     "AutoLink": {
       "Enabled": true,
-      "TagGroup": "autolink",
-      "KeywordsPropertyAlias": "linkKeywords",
       "ExcludePropertyAlias": "excludeFromAutoLinking",
       "ExternalLinkRel": "nofollow",
       "MaxLinksPerKeyword": 1,
@@ -559,33 +675,44 @@ is fast enough that a stamp-keyed `IAppPolicyCache` is not worth the complexity 
 }
 ```
 
-`TagGroup` **must match the group declared by the datatype bound to `linkKeywords`**, or nothing links.
-Umbraco's stock Tags datatype declares the catch-all `default` group, so pointing at that feeds every other
-stock Tags property on the site into the linker. Give the linker its own datatype and its own group — which is
-what `InstallSchema` creates — then check the doctype property actually points at it.
-
-> **This is the setup trap, and it fails silently.** Tag relations are written into the group the *datatype*
-> declares, and the registry only ever queries `TagGroup`. Bind `linkKeywords` to the stock Tags datatype (group
-> `default`) while `TagGroup` says `autolink`, and every save works perfectly, writes real relations, and the
-> registry sees nothing. The property shows the keywords in the content editor the whole time, so nothing looks
-> broken. The dashboard's empty state says as much — check which datatype the property is bound to before
-> assuming the linker is broken.
+**Nothing here needs configuring to make linking work.** Keywords are added on the screen, so there is no tag group
+to match and no property alias to get right — which retired the one setup trap in this package that failed silently.
+It used to be possible to bind `linkKeywords` to the stock Tags datatype (group `default`) while the configured
+`TagGroup` said `autolink`: every save worked, wrote real relations, showed the keywords in the content editor, and
+the registry saw nothing at all.
 
 Bound through `IOptionsMonitor`, so edits apply **without a restart**.
 
-### Schema installer
+### Schema install
 
-`AutoLinkSchemaInstaller` creates the `Auto-link Keywords` Tags datatype and adds `linkKeywords` +
-`excludeFromAutoLinking` to the configured document types at startup. Idempotent, additive, and failures are
-logged rather than thrown.
+`InstallAutoLinkSchema` adds `excludeFromAutoLinking` to the nominated document types, and nothing else. Idempotent
+and additive: an existing property is left alone, and nothing is ever renamed, moved or deleted. It is optional in
+every sense — without it, every page stays scannable.
 
-This is PoC convenience so the demo is reproducible from a clean database. A shipping package would use a
-migration plan. Set `InstallSchema: false` to turn it off.
+It is a **migration**, in its own `OC.AutoLink.Schema` plan, so it runs **once** rather than at every startup. That
+was the last startup-fixup left in the package, and it was the wrong shape for a shipping one: editing somebody's
+document types every time their site boots is nobody's expectation.
 
-> **First run only:** because the site uses `InMemoryAuto` models, changing content types at startup
-> regenerates the models under already-compiled views, and the first page load after install fails with
-> `ModelBindingException: ... application is in an unstable state and should be restarted`. Restart once and
-> it is gone — the installer is idempotent so it makes no changes on subsequent boots.
+Two consequences worth knowing, both falling out of "once":
+
+- **The plan is not executed until the feature is configured.** A plan step is spent for good, so consuming it on an
+  install that nominated nothing would mean a site that configured `InstallSchema` afterwards never got the schema.
+  `AutoLinkMigrationHandler` only runs this plan when `InstallSchema` is true *and* `InstallOnDocumentTypes` is
+  non-empty.
+- **A nominated document type that does not exist throws**, rather than being skipped. That leaves the plan state
+  where it was, so the next boot tries again. An unattended install imports its starter kit around the same runtime
+  the migration hooks, so the document types can genuinely arrive after the first attempt — and a one-shot that
+  quietly gave up on them would leave a site that looks installed and links nothing. A wrong alias in configuration
+  lands in the same place, and says so in the log once per boot until somebody fixes it.
+
+Once the plan has run, a document type nominated *later* is not retro-fitted. Add the property to it in the
+backoffice, the same way you would any other.
+
+> **First run only:** because the site uses `InMemoryAuto` models, changing content types regenerates the models
+> under already-compiled views, and the first page load after the schema install fails with
+> `ModelBindingException: ... application is in an unstable state and should be restarted`. Restart once and it is
+> gone. As a migration this can now only happen on the single boot that installs the schema, rather than being a
+> thing every boot could do.
 
 ---
 
@@ -597,32 +724,39 @@ migration plan. Set `InstallSchema: false` to turn it off.
 - **Delivery API output is not linked**, only delegated. Deliberate, out of scope.
 - **CDN.** Render-time healing stops at the edge. Either wire a purge into the stamp bump or accept that
   retroactive links appear on natural TTL expiry.
-- **Mapping changes only invalidate the node that served the request.** Publishing propagates through
-  Umbraco's distributed cache; a mapping saved through the API does not. Single node, irrelevant. Load
-  balanced, it needs an `ICacheRefresher` plus `DistributedCache.RefreshAll`.
 - **The API is gated on section access, not on a per-keyword permission.** Anybody who can see the section can
-  remap any keyword.
-- **A keyword can only be pointed at a page that carries its tag** from the screen. Mapping to an untagged page is
-  still supported by the store and still reported, it just is not offered, because a free page picker obscured why a
-  keyword linked where it did.
-- **A mapping is cleared for the culture it was made for**, not the culture being viewed, so an all-languages
-  decision can be cleared while looking at a single language.
-- **All-culture decisions cannot be made from the UI when keywords vary.** The invariant tab has no candidates to
-  act on, so every decision made through the screen is culture-specific. The all-culture rows exist for invariant
-  sites and for decisions made before a site went multilingual.
+  point any keyword anywhere, or delete it.
+- **A keyword cannot be renamed.** The keyword is the row's identity, and suppressions are keyed on it, so renaming
+  would orphan them. Remove it and add the new spelling.
+- **A keyword is removed for the culture it was created in**, not the culture being viewed, so an all-languages
+  keyword can be removed while looking at a single language.
+- **A keyword added from the screen is always culture-specific** when the site has languages, since the screen adds
+  it to the language being viewed. All-culture rows exist for single-language sites and for keywords added before a
+  site went multilingual; making one deliberately on a multilingual site means writing the row through the API with
+  an empty culture.
+- **Media is not a destination.** The picker offers it, and it is refused: a media URL is site-relative and the URL
+  validation deliberately insists on absolute http or https.
+- **"Open in new window" is ignored.** The picker offers it and cannot be told not to; the screen says it will not
+  be used.
 - **Segments are not handled.** `VariationContext` carries a segment as well as a culture; only culture is used.
 - **Stored decision cultures are lower-cased**, since they are index keys compared case-insensitively. The screen
   shows culture codes from the registry, not from the stored row, so `en-US` still displays properly.
 - **The scan says what would happen now, not what was served.** If you need "which pages carried this link last
-  month", that needs observations written down as pages render — the relations audit trail, which is still unbuilt.
+  month", that needs observations written down as pages render. The relations are a snapshot of the last scan, not
+  a history.
+- **Relations are only as fresh as the last scan.** They update when somebody opens the dashboard or calls
+  `POST /relations`. A page published since then can carry a link that no relation records yet, so the delete
+  warning can undercount.
+- **A keyword whose target nothing mentions raises no dependency warning**, because there is no rendered link and
+  so no relation. The notification handler still logs it.
 - **The scan is synchronous.** 34 ms for 25 pages extrapolates fine to a few hundred, but a site with thousands of
   pages wants it backgrounded with progress rather than held open on one request.
 - **A skipped mention is reported once per keyword per reason**, not once per occurrence, so a page mentioning a
   keyword ten times shows one "only the first mention is linked" row rather than nine.
 - **Suppression is per keyword per page, not per occurrence.** With `MaxLinksPerKeyword: 1` that distinction rarely
   matters, since only the first mention is linked anyway.
-- **Conflicts are only visible once both pages are published.** The registry reads the published cache, so a
-  contested keyword on an unpublished draft does not show up until it goes live.
+- **A keyword pointing at an unpublished page reports as unresolved**, not as "publish this". The registry reads the
+  published cache, so a target that exists only as a draft is indistinguishable from one that was deleted.
 
 ---
 
@@ -641,12 +775,23 @@ Fixed, with the reasoning worth keeping:
 - **Migrations use `AsyncMigrationBase`.** `MigrationBase` is obsolete and scheduled for removal in Umbraco 18.
 - **AngleSharp 1.7.1**, clearing GHSA-pgww-w46g-26qg. It runs on every page render, so an advisory there is not
   something to carry.
-- **The schema installer is opt-in and nominates nothing.** `InstallSchema` defaults to false and
+- **The schema install is opt-in, nominates nothing, and runs once.** `InstallSchema` defaults to false and
   `InstallOnDocumentTypes` to empty. Guessing alias names was fine for a spike; a package editing document types at
-  every boot, on types nobody nominated, is not.
+  every boot, on types nobody nominated, is not. It is now a migration in its own plan, executed only once the
+  feature is configured so that configuring it later still works. It also has far less to do than it did: one
+  optional boolean, now that keywords are not a property.
+- **Both database providers, verified rather than assumed.** A clean install was run end to end on SQLite and on
+  SQL Server: both plans apply, both tables come out with the right column types (`uniqueidentifier`, `bit`,
+  `nvarchar` lengths), and the second boot does no work on either. The three places a provider difference could
+  bite are handled by design, not by luck — `keywordKey` is lower-cased so uniqueness behaves the same under SQL
+  Server's case-insensitive collation as under SQLite's case-sensitive one; `pageKey` uses `Guid.Empty` rather than
+  `NULL` because a unique index treats two nulls as equal on one and distinct on the other; and both index keys stay
+  well under SQL Server's 900-byte limit, which raising `[Length]` on `keywordKey` past ~430 would breach on SQL
+  Server alone. The one raw statement in the package, `DROP TABLE IF EXISTS` in the teardown, needs SQL Server 2016,
+  which is Umbraco 17's documented minimum.
 - **41 tests**, covering what must not silently regress: word boundaries, longest-keyword-first, skipped elements,
   never nesting an anchor, not rewriting attributes, the per-keyword cap, hand-link detection, self-linking, external
-  markup and rel, contested keywords reserving their span, culture fallback, decision precedence, and the narrowest
+  markup and rel, suppressed keywords reserving their span, culture fallback, row precedence, and the narrowest
   suppression row winning. Verified by mutation: breaking longest-first fails a test.
 - **Warnings are errors** in the package, and CI fails the build if the dashboard or the backoffice manifest stops
   being packed.
@@ -664,15 +809,19 @@ It drops both decision tables and **resets the migration state**, which is the p
 while `umbracoKeyValue` still records the plan as complete means a reinstall never recreates them, and the package
 comes back up permanently broken with stores that log and return empty.
 
-Document types are left alone on purpose. The keyword property holds editors' data, and deleting it would take every
-keyword on every page with it. Delete the property yourself if you want it gone.
+**It takes every keyword with it**, which it did not used to. These tables once held decisions layered over tags, so a
+teardown lost the decisions and left the keywords in the content; they are now the only place keywords exist. There is
+no other copy.
+
+Document types are left alone on purpose, so `excludeFromAutoLinking` and any values in it survive. Delete the
+property yourself if you want it gone.
 
 Deliberately not a button in the dashboard: a destructive action one click from the screen editors use every day is a
 mistake waiting to happen. The confirmation token exists for the same reason.
 
 **It needs an administrator, not just section access.** Every other endpoint here is gated on access to the
-Auto-linking section, which is the permission an editor settling keyword collisions holds — not the permission to drop
-both tables. So teardown carries a second policy requiring the admin group, and both apply: the administrator running
+Auto-linking section, which is the permission an editor curating keywords holds — not the permission to drop both
+tables. So teardown carries a second policy requiring the admin group, and both apply: the administrator running
 it needs the section granted too, which is the same tick that let them open the dashboard. The token stops a mistake;
 it was never authorization.
 
@@ -717,7 +866,6 @@ names its own subject, so it reads whether it follows "Not linked:" or "Another 
 | Item | Why it is not done |
 |---|---|
 | Consumer documentation | This README is a build log. A shipping package needs a shorter one aimed at somebody installing it. |
-| Schema install as a migration | Still a startup fixup rather than a run-once migration, now that a plan exists to put it in. |
 | Delivery API | Delegated but not linked. Decide whether to support it or document it as out of scope. |
 | Accessibility, verified | The structure is sound, but nothing has been through a screen reader. |
 | Segments | `VariationContext` carries a segment as well as a culture; only culture is used. |
@@ -742,6 +890,9 @@ about.
 
 ## Deliberately not built
 
-Relations audit trail (the dry-run scan answers the same question without storage, but not historically),
 Automate actions, Tiptap editor decoration, orphan keyword digest, Delivery API support, the stamp-keyed cache
 layer. All known territory; they add days and prove nothing the spikes did not.
+
+The relations audit trail *was* on this list, on the grounds that the dry-run scan answers "which pages carry
+links" without storing anything. It got built anyway for a different reason: not to answer that question, but so
+Umbraco can warn before somebody deletes a page other pages link to. See section 12.

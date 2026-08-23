@@ -1,10 +1,10 @@
 namespace OC.AutoLink.Persistence;
 
 /// <summary>
-/// A stored decision about which page a keyword belongs to.
+/// A keyword and the destination somebody chose for it. The only source of keywords there is.
 /// </summary>
 /// <param name="Keyword">The keyword, in the casing it was saved with.</param>
-/// <param name="TargetKey">Key of the page it was mapped to, or empty for an external link.</param>
+/// <param name="TargetKey">Key of the page it points at, or empty for an external link.</param>
 /// <param name="ExternalUrl">Absolute URL outside the site, or null when the destination is a page.</param>
 /// <param name="Label">Label for an external link, or null to fall back to the host.</param>
 /// <param name="Nofollow">Overrides the configured rel default, or null to follow it.</param>
@@ -24,7 +24,7 @@ public sealed record KeywordMapping(
     /// <summary>Points outside the site rather than at a page.</summary>
     public bool IsExternal => !string.IsNullOrEmpty(ExternalUrl);
 
-    /// <summary>Applies to every culture, which is what a decision made before the site varied means.</summary>
+    /// <summary>Applies to every culture, which is what a keyword added before the site varied means.</summary>
     public bool IsAllCultures => Culture.Length == 0;
 
     /// <summary>
@@ -32,7 +32,7 @@ public sealed record KeywordMapping(
     /// them.
     /// </summary>
     /// <remarks>
-    /// Shared deliberately. The registry resolves links with this and the backoffice reports them with it, and the
+    /// Shared deliberately. The registry resolves links with this and the backoffice lists them with it, and the
     /// whole point of that screen is that it cannot disagree with the renderer — which it would the moment the
     /// precedence rule existed in two places.
     /// </remarks>

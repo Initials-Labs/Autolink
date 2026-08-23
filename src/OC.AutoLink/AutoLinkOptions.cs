@@ -13,16 +13,6 @@ public sealed class AutoLinkOptions
     public bool Enabled { get; set; } = true;
 
     /// <summary>
-    /// Tag group the keyword registry reads from. Must match the group configured on the Tags datatype.
-    /// </summary>
-    public string TagGroup { get; set; } = "autolink";
-
-    /// <summary>
-    /// Tags property holding the keywords a page should be linked from.
-    /// </summary>
-    public string KeywordsPropertyAlias { get; set; } = "linkKeywords";
-
-    /// <summary>
     /// Boolean property that opts a page out of being <em>scanned</em>. A page can still be a link target.
     /// </summary>
     public string ExcludePropertyAlias { get; set; } = "excludeFromAutoLinking";
@@ -54,7 +44,7 @@ public sealed class AutoLinkOptions
     ];
 
     /// <summary>
-    /// Document type aliases the schema installer adds the keyword properties to. Empty disables the installer.
+    /// Document type aliases the schema installer adds the scan opt-out property to. Empty disables the installer.
     /// </summary>
     /// <remarks>
     /// Empty by default. Guessing alias names on somebody else's site was fine for a spike and wrong for a package:
@@ -63,13 +53,23 @@ public sealed class AutoLinkOptions
     public string[] InstallOnDocumentTypes { get; set; } = [];
 
     /// <summary>
-    /// When true, ensures the Tags datatype and keyword properties exist at startup.
+    /// When true, adds the <see cref="ExcludePropertyAlias"/> property to the document types named in
+    /// <see cref="InstallOnDocumentTypes"/>.
     /// </summary>
     /// <remarks>
-    /// Off by default: installing it means a package editing document types every time the site boots, which is
-    /// nobody's expectation. Turn it on to have the schema created for you, or create the Tags datatype and the two
-    /// properties yourself and leave this alone. Moving the work into the migration plan, so it runs once rather
-    /// than at every startup, is the outstanding improvement here.
+    /// Off by default: adding a property to somebody's document types is not a decision a package gets to make on
+    /// its own. Turn it on to have it created for you, or add a True/false property with that alias yourself and
+    /// leave this alone. Either way it is optional — without it, every page stays scannable.
+    /// <para>
+    /// Keywords are not installed as a property at all. They live in the package's own table and are edited on the
+    /// Auto-linking screen, so there is nothing to add to a document type and nothing to fill in per page.
+    /// </para>
+    /// <para>
+    /// The work runs once, from the package's own <c>OC.AutoLink.Schema</c> migration plan, rather than at every
+    /// startup. Nothing is consumed until at least one document type is nominated, so turning this on after the
+    /// first boot still works. Once it has run, though, a document type nominated later is not retro-fitted: add
+    /// the property to it in the backoffice, the same way you would any other.
+    /// </para>
     /// </remarks>
     public bool InstallSchema { get; set; }
 }
