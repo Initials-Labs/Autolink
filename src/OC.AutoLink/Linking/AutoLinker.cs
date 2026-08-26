@@ -15,7 +15,7 @@ using Umbraco.Extensions;
 namespace OC.AutoLink.Linking;
 
 /// <inheritdoc />
-public sealed class AutoLinker : IAutoLinker
+internal sealed class AutoLinker : IAutoLinker
 {
     private readonly IKeywordRegistry _registry;
     private readonly IUmbracoContextAccessor _umbracoContextAccessor;

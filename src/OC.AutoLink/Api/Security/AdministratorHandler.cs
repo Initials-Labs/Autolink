@@ -6,7 +6,7 @@ using Umbraco.Cms.Core.Security.Authorization;
 namespace OC.AutoLink.Api.Security;
 
 /// <inheritdoc cref="AdministratorRequirement" />
-public sealed class AdministratorHandler : AuthorizationHandler<AdministratorRequirement>
+internal sealed class AdministratorHandler : AuthorizationHandler<AdministratorRequirement>
 {
     private readonly IAuthorizationHelper _authorizationHelper;
 

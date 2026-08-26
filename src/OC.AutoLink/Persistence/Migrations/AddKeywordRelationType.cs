@@ -18,7 +18,7 @@ namespace OC.AutoLink.Persistence.Migrations;
 /// to delete a page, through Umbraco's own tracked references rather than a warning of ours bolted on beside it.
 /// </para>
 /// </remarks>
-public sealed class AddKeywordRelationType : AsyncMigrationBase
+internal sealed class AddKeywordRelationType : AsyncMigrationBase
 {
     private readonly IRelationService _relationService;
 

@@ -1,8 +1,8 @@
 {
-  "$schema": "../../../Autolink/umbraco-package-schema.json",
+  "$schema": "../../umbraco-package-schema.json",
   "name": "OC.AutoLink",
   "version": "0.1.0",
-  "allowTelemetry": false,
+  "allowTelemetry": true,
   "extensions": [
     {
       "type": "localization",

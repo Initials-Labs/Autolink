@@ -13,7 +13,7 @@ namespace OC.AutoLink.Install;
 /// never get the property. <see cref="Notifications.AutoLinkMigrationHandler"/> executes this plan only once the
 /// feature is actually configured, which is what keeps that step available until there is something for it to do.
 /// </remarks>
-public sealed class AutoLinkSchemaMigrationPlan : MigrationPlan
+internal sealed class AutoLinkSchemaMigrationPlan : MigrationPlan
 {
     public AutoLinkSchemaMigrationPlan() : base("OC.AutoLink.Schema")
     {

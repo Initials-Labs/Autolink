@@ -28,7 +28,7 @@ namespace OC.AutoLink.Notifications;
 /// them separately matters because they fail for unrelated reasons and one must not hide the other.
 /// </para>
 /// </remarks>
-public sealed class AutoLinkMigrationHandler : INotificationAsyncHandler<UmbracoApplicationStartedNotification>
+internal sealed class AutoLinkMigrationHandler : INotificationAsyncHandler<UmbracoApplicationStartedNotification>
 {
     private readonly ICoreScopeProvider _scopeProvider;
     private readonly IMigrationPlanExecutor _migrationPlanExecutor;

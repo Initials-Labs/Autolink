@@ -48,7 +48,7 @@ public interface IAutoLinkUninstaller
 /// package and the wrong thing to run by accident, which is what the confirmation token on the endpoint is for.
 /// </para>
 /// </remarks>
-public sealed class AutoLinkUninstaller : IAutoLinkUninstaller
+internal sealed class AutoLinkUninstaller : IAutoLinkUninstaller
 {
     private readonly IScopeProvider _scopeProvider;
     private readonly IKeyValueService _keyValueService;

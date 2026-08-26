@@ -12,7 +12,7 @@ namespace OC.AutoLink.Caching;
 /// balanced site or Umbraco Cloud the other nodes carried on serving the old links indefinitely. Going through the
 /// distributed cache makes the invalidation land everywhere.
 /// </remarks>
-public sealed class AutoLinkCacheRefresher : ICacheRefresher
+internal sealed class AutoLinkCacheRefresher : ICacheRefresher
 {
     /// <summary>Stable identity for this refresher. Must not change once deployed.</summary>
     public static readonly Guid RefresherId = new("3f1c7a52-9e64-4c1f-9c2c-6b1a0f7d5e10");

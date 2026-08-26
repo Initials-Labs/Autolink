@@ -5,7 +5,7 @@ using Umbraco.Cms.Core.Security.Authorization;
 namespace OC.AutoLink.Api.Security;
 
 /// <inheritdoc />
-public sealed class SectionAccessHandler : AuthorizationHandler<SectionAccessRequirement>
+internal sealed class SectionAccessHandler : AuthorizationHandler<SectionAccessRequirement>
 {
     private readonly IAuthorizationHelper _authorizationHelper;
 

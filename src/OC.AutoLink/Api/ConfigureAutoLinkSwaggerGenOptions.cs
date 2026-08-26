@@ -10,7 +10,7 @@ namespace OC.AutoLink.Api;
 /// Registers the Swagger document the controllers map to. Without this the endpoints still route, they just do
 /// not show up in the API browser, which makes them harder to poke at from curl during a demo.
 /// </summary>
-public sealed class ConfigureAutoLinkSwaggerGenOptions : IConfigureOptions<SwaggerGenOptions>
+internal sealed class ConfigureAutoLinkSwaggerGenOptions : IConfigureOptions<SwaggerGenOptions>
 {
     public void Configure(SwaggerGenOptions options) =>
         options.SwaggerDoc(

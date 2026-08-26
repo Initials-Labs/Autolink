@@ -6,7 +6,7 @@ namespace OC.AutoLink.Persistence.Migrations;
 /// <summary>
 /// Creates the keyword suppression table.
 /// </summary>
-public sealed class AddKeywordSuppressionTable : AsyncMigrationBase
+internal sealed class AddKeywordSuppressionTable : AsyncMigrationBase
 {
     public AddKeywordSuppressionTable(IMigrationContext context) : base(context)
     {

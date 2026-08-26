@@ -51,7 +51,7 @@ public readonly record struct AutoLinkRelationChanges(int Added, int Removed)
 /// a couple of queries on top and cannot disagree with the report the editor is looking at.
 /// </para>
 /// </remarks>
-public sealed class AutoLinkRelationWriter : IAutoLinkRelationWriter
+internal sealed class AutoLinkRelationWriter : IAutoLinkRelationWriter
 {
     private readonly IRelationService _relationService;
     private readonly IIdKeyMap _idKeyMap;
