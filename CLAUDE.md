@@ -169,7 +169,7 @@ keyword whose target nothing mentions has no relation and so raises no dependenc
 Deleting the page clears them — but Umbraco does that itself, during the delete, before `ContentDeletedNotification`
 fires. Our handler is a backstop that normally finds nothing. Do not "fix" it by assuming it is doing the work.
 
-Full write-up, including the v17 authorization traps that cost the most time, in `src/OC.AutoLink/README.md`.
+Full write-up, including the v17 authorization traps that cost the most time, in `docs/build-log.md`.
 
 ---
 
@@ -269,7 +269,7 @@ Three spikes. Total estimate **1–2 focused days**. Risk is concentrated in Spi
 is binary, not gradual.
 
 > **All three spikes pass.** Built in `src/OC.AutoLink/`, verified on the Clean site in `Autolink/`.
-> See `src/OC.AutoLink/README.md` for evidence and measurements.
+> See `docs/build-log.md` for evidence and measurements.
 >
 > Spike 0 turned out to be a stronger test than planned: Clean has **no top-level RTE property on `article`
 > at all** — every piece of article body copy is `richTextRow.content` inside a Block List. The nested case
