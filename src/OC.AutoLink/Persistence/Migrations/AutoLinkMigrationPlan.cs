@@ -13,7 +13,7 @@ namespace OC.AutoLink.Persistence.Migrations;
 /// would never run to do it.
 /// </para>
 /// </summary>
-public sealed class AutoLinkMigrationPlan : MigrationPlan
+internal sealed class AutoLinkMigrationPlan : MigrationPlan
 {
     public AutoLinkMigrationPlan() : base("OC.AutoLink")
     {

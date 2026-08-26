@@ -11,6 +11,6 @@ namespace OC.AutoLink.Api.Security;
 /// confirmation token prevents an accident, not a permission, so "destructive" is a separate authorization concept
 /// here rather than a string comparison inside one action.
 /// </remarks>
-public sealed class AdministratorRequirement : IAuthorizationRequirement
+internal sealed class AdministratorRequirement : IAuthorizationRequirement
 {
 }

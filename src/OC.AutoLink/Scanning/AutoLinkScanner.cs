@@ -33,7 +33,7 @@ public interface IAutoLinkScanner
 /// What it deliberately is not is a history of what was served; that would need writing observations down as
 /// pages render.
 /// </remarks>
-public sealed class AutoLinkScanner : IAutoLinkScanner
+internal sealed class AutoLinkScanner : IAutoLinkScanner
 {
     /// <summary>Depth guard for nested blocks. Deep enough for any real layout, shallow enough to stop a cycle.</summary>
     private const int MaxBlockDepth = 10;

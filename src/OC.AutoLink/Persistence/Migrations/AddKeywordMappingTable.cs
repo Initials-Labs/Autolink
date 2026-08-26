@@ -6,7 +6,7 @@ namespace OC.AutoLink.Persistence.Migrations;
 /// <summary>
 /// Creates the manual mapping table.
 /// </summary>
-public sealed class AddKeywordMappingTable : AsyncMigrationBase
+internal sealed class AddKeywordMappingTable : AsyncMigrationBase
 {
     public AddKeywordMappingTable(IMigrationContext context) : base(context)
     {

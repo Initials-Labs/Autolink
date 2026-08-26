@@ -11,7 +11,7 @@ namespace OC.AutoLink.Models;
 /// <c>javascript:</c> and <c>data:</c> an XSS vector. Checked when the row is saved and again when the registry
 /// builds, so a row written by any other route cannot render a hostile scheme.
 /// </remarks>
-public static class ExternalUrl
+internal static class ExternalUrl
 {
     /// <summary>
     /// True when the value is an absolute http or https URL, returning it trimmed.

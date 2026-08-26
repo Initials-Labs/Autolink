@@ -171,6 +171,35 @@ fires. Our handler is a backstop that normally finds nothing. Do not "fix" it by
 
 Full write-up, including the v17 authorization traps that cost the most time, in `docs/build-log.md`.
 
+### 10. Public means promised: interfaces yes, implementations no
+
+Added when the package became NuGet-installable. Everything was `public`, which at 1.0 would make all 65 types a
+compatibility promise — and the implementations are exactly what churns.
+
+So: **service interfaces and the models they expose are public, every implementation is internal.** 65 public types
+down to 32. Tests reach the implementations through `InternalsVisibleTo`, because the rules live in the
+implementations, not the interfaces.
+
+**The split is not a matter of taste, it is forced, and the forcing chain is worth knowing.** ASP.NET Core only
+discovers `public` controllers, a public constructor cannot take a less accessible parameter (CS0051), and the
+controllers are constructor-injected with `IAutoLinkScanner`, `IKeywordRegistry`, `IKeywordMappingStore`,
+`IKeywordSuppressionStore`, `IAutoLinkRelationWriter` and `IAutoLinkUninstaller`. Those six are therefore public
+whether you like it or not, and everything reachable through their members follows them out — which is why
+`AutoLinkScanReport`, `AutoLinkPlacement`, `KeywordMapping` and friends are still public. `AutoLinkPlacement` was
+tried as internal and the compiler refused, via `ScannedPage`.
+
+`IAutoLinker` and `IKeywordRegistryInvalidator` went internal because nothing public injects them. `IAutoLinker`
+also could not have been public honestly: `Preview` takes `AutoLinkRequestState`, which is per-request plumbing
+nobody outside could construct.
+
+**Compiling clean proves nothing here, so it was checked on a running site.** Umbraco finds migrations, the cache
+refresher and the property value converter by reflection and DI, and every one of those failures is silent. Verified
+on the Clean site: both migration plans ran from the log, `data-autolink` anchors rendered on three pages including
+an external one, the six endpoints appeared in `/umbraco/swagger` and returned 401 rather than 500. Re-check the
+same four things if the accessibility of anything registered in the composer changes.
+
+Only `AutoLinkComposer` still relies on being publicly scanned. Do not make it internal.
+
 ---
 
 ## Architecture

@@ -37,7 +37,7 @@ namespace OC.AutoLink.Install;
 /// misconfiguration, and it says so once per boot until somebody fixes it.
 /// </para>
 /// </remarks>
-public sealed class InstallAutoLinkSchema : AsyncMigrationBase
+internal sealed class InstallAutoLinkSchema : AsyncMigrationBase
 {
     private const string PropertyGroupAlias = "autoLinking";
     private const string PropertyGroupName = "Auto-linking";

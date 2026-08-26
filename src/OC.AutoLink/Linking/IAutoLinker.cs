@@ -5,7 +5,7 @@ namespace OC.AutoLink.Linking;
 /// <summary>
 /// Turns keyword mentions in a fragment of rich text markup into links.
 /// </summary>
-public interface IAutoLinker
+internal interface IAutoLinker
 {
     /// <summary>
     /// Returns <paramref name="markup"/> with keyword mentions linked. Returns the exact same string instance

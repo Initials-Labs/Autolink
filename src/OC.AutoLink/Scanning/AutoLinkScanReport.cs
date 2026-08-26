@@ -32,7 +32,7 @@ public sealed record SkippedPage(Guid PageKey, string Name, string Culture, stri
 /// <summary>
 /// Why a whole page could not be examined. Page-level counterpart to the per-mention reasons.
 /// </summary>
-public static class AutoLinkScanSkipReason
+internal static class AutoLinkScanSkipReason
 {
     /// <summary>No routable URL in this culture, usually because the variant is not published.</summary>
     public const string Unroutable = "unroutable";

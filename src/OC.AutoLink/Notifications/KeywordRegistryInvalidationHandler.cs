@@ -22,7 +22,7 @@ namespace OC.AutoLink.Notifications;
 /// Invalidation stays deliberately global: any page's output depends on the whole keyword set, and the registry only
 /// moves its stamp when a rebuild actually hashes differently.
 /// </remarks>
-public sealed class KeywordRegistryInvalidationHandler : INotificationHandler<ContentCacheRefresherNotification>
+internal sealed class KeywordRegistryInvalidationHandler : INotificationHandler<ContentCacheRefresherNotification>
 {
     private readonly IKeywordRegistry _registry;
 

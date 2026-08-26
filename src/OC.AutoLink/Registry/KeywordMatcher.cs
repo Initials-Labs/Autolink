@@ -13,7 +13,7 @@ namespace OC.AutoLink.Registry;
 /// which keywords are matchable.
 /// </para>
 /// </remarks>
-public static class KeywordMatcher
+internal static class KeywordMatcher
 {
     /// <summary>
     /// The matcher for one culture's keyword set, or null when there is nothing to match.

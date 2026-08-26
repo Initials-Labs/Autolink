@@ -8,7 +8,7 @@ namespace OC.AutoLink.Models;
 /// used to be a silent skip, which made the audit impossible to trust: a page could mention a keyword three times
 /// and appear once, with nothing saying why.
 /// </remarks>
-public static class AutoLinkSkipReason
+internal static class AutoLinkSkipReason
 {
     /// <summary>The mentioning page is the page the keyword points at.</summary>
     public const string SelfLink = "self";

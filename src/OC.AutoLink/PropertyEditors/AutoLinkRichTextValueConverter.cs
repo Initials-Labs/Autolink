@@ -25,7 +25,7 @@ namespace OC.AutoLink.PropertyEditors;
 /// <c>richTextRow.content</c> inside a Block List.
 /// </para>
 /// </remarks>
-public sealed class AutoLinkRichTextValueConverter : IPropertyValueConverter, IDeliveryApiPropertyValueConverter
+internal sealed class AutoLinkRichTextValueConverter : IPropertyValueConverter, IDeliveryApiPropertyValueConverter
 {
     private readonly RteBlockRenderingValueConverter _inner;
     private readonly IAutoLinker _linker;

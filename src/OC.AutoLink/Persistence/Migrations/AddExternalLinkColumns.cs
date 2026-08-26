@@ -12,7 +12,7 @@ namespace OC.AutoLink.Persistence.Migrations;
 /// Rebuilt rather than altered, for the same reason as the culture migration: Umbraco's migration layer refuses
 /// ALTER TABLE outright on SQLite. Existing rows are page mappings, so the new columns are simply left null.
 /// </remarks>
-public sealed class AddExternalLinkColumns : AsyncMigrationBase
+internal sealed class AddExternalLinkColumns : AsyncMigrationBase
 {
     public AddExternalLinkColumns(IMigrationContext context) : base(context)
     {

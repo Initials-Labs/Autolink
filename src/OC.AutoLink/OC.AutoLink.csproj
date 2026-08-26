@@ -59,4 +59,10 @@
     <PackageReference Include="AngleSharp" Version="1.7.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The implementations are internal, and the tests test the implementations rather than the interfaces,
+         because that is where the rules live. -->
+    <InternalsVisibleTo Include="OC.AutoLink.Tests" />
+  </ItemGroup>
+
 </Project>

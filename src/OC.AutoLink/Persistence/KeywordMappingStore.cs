@@ -8,7 +8,7 @@ using Umbraco.Extensions;
 namespace OC.AutoLink.Persistence;
 
 /// <inheritdoc />
-public sealed class KeywordMappingStore : IKeywordMappingStore
+internal sealed class KeywordMappingStore : IKeywordMappingStore
 {
     private readonly IScopeProvider _scopeProvider;
     private readonly IKeywordRegistryInvalidator _invalidator;

@@ -10,7 +10,7 @@ namespace OC.AutoLink.Api.Security;
 /// internal, so a package that adds its own section has to bring its own. The check itself is the same one:
 /// the section alias against <see cref="Umbraco.Cms.Core.Models.Membership.IUser.AllowedSections"/>.
 /// </remarks>
-public sealed class SectionAccessRequirement : IAuthorizationRequirement
+internal sealed class SectionAccessRequirement : IAuthorizationRequirement
 {
     public SectionAccessRequirement(string sectionAlias) => SectionAlias = sectionAlias;
 

@@ -15,7 +15,7 @@ using Umbraco.Cms.Core.Web;
 namespace OC.AutoLink.Registry;
 
 /// <inheritdoc />
-public sealed class KeywordRegistry : IKeywordRegistry
+internal sealed class KeywordRegistry : IKeywordRegistry
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IOptionsMonitor<AutoLinkOptions> _options;

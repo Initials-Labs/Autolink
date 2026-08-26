@@ -38,7 +38,7 @@ namespace OC.AutoLink.Install;
 /// datatype, it is still what opts a page out of being scanned, and it is genuinely a property of a page.
 /// </para>
 /// </remarks>
-public sealed class RemoveLegacyKeywordProperty : AsyncMigrationBase
+internal sealed class RemoveLegacyKeywordProperty : AsyncMigrationBase
 {
     /// <summary>
     /// The alias the old installer used. Hard-coded rather than read from configuration, because the option that

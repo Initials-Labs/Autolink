@@ -47,7 +47,7 @@ public interface IKeywordSuppressionStore
 }
 
 /// <inheritdoc />
-public sealed class KeywordSuppressionStore : IKeywordSuppressionStore
+internal sealed class KeywordSuppressionStore : IKeywordSuppressionStore
 {
     private readonly IScopeProvider _scopeProvider;
     private readonly IKeywordRegistryInvalidator _invalidator;

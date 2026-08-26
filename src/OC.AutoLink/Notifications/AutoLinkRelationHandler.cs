@@ -22,7 +22,7 @@ namespace OC.AutoLink.Notifications;
 /// knows a consequence worth mentioning first.
 /// </para>
 /// </remarks>
-public sealed class AutoLinkRelationHandler :
+internal sealed class AutoLinkRelationHandler :
     INotificationHandler<ContentMovingToRecycleBinNotification>,
     INotificationHandler<ContentDeletingNotification>,
     INotificationHandler<ContentDeletedNotification>

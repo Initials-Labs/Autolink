@@ -8,7 +8,7 @@ namespace OC.AutoLink.Linking;
 /// rich text properties — every rich text block in a Block List is its own property conversion. This rides on
 /// the request cache so the count carries across all of them.
 /// </remarks>
-public sealed class AutoLinkRequestState
+internal sealed class AutoLinkRequestState
 {
     public const string CacheKey = "OC.AutoLink.RequestState";
 
