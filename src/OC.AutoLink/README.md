@@ -87,6 +87,19 @@ Bound through `IOptionsMonitor`, so edits apply without a restart. The full set 
 `excludeFromAutoLinking` property for pages that should not be scanned at all, is documented on `AutoLinkOptions` —
 the package ships its XML docs, so your IDE has them.
 
+## Telemetry
+
+**This package sends nothing anywhere of its own.** It adds five anonymous counts to the telemetry report Umbraco
+already sends to `telemetry.umbraco.com`, under the level you chose in Settings → Telemetry Data, and only if that
+level is **Detailed**. At Basic, Umbraco reports the package name and version; at Minimal, nothing about it at all.
+
+The five counts, and all there is: keywords, keywords pointing at an external URL, cultures with a
+culture-specific keyword, per-page suppressions, and global suppressions. **No keyword text, no URLs, no page keys,
+no user names.** A keyword is your editorial content and a destination URL can identify a client, so neither goes
+in a report about the package.
+
+The author does not receive this data. Umbraco aggregates it for the Marketplace.
+
 ## Removing it
 
 Umbraco has no uninstall hook for a NuGet package: removing the reference removes the assembly and leaves the two

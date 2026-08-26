@@ -11,12 +11,14 @@ using OC.AutoLink.PropertyEditors;
 using OC.AutoLink.Registry;
 using OC.AutoLink.Relations;
 using OC.AutoLink.Scanning;
+using OC.AutoLink.Telemetry;
 using OC.AutoLink.Uninstall;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Notifications;
 using Umbraco.Cms.Core.PropertyEditors.ValueConverters;
+using Umbraco.Cms.Infrastructure.Telemetry.Interfaces;
 using Umbraco.Extensions;
 
 namespace OC.AutoLink.Composing;
@@ -37,6 +39,10 @@ public sealed class AutoLinkComposer : IComposer
         builder.Services.AddSingleton<IAutoLinkUninstaller, AutoLinkUninstaller>();
         builder.Services.AddSingleton<IKeywordRegistry, KeywordRegistry>();
         builder.Services.AddSingleton<IAutoLinker, AutoLinker>();
+
+        // Adds our counts to the telemetry report Umbraco already sends, not a report of our own. Plain DI rather
+        // than a collection builder: UsageInformationService takes IEnumerable<IDetailedTelemetryProvider>.
+        builder.Services.AddTransient<IDetailedTelemetryProvider, AutoLinkTelemetryProvider>();
 
         // Replacing the built-in converter removes it from the collection, and with it its DI registration.
         // Register it explicitly so the wrapper can still resolve and delegate to it.
