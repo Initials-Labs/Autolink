@@ -14,6 +14,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # One version number lives in five places: the csproj, the manifest, and a cache-buster on each of the
+      # three asset paths. They drift the first release somebody bumps four of them, and a stale ?v= serves a
+      # consumer last version's dashboard out of their browser cache. Cheaper to check than to notice.
+      - name: Check the version numbers agree
+        run: |
+          csproj=$(grep -oPm1 '(?<=<Version>)[^<]+' src/OC.AutoLink/OC.AutoLink.csproj)
+          echo "csproj declares $csproj"
+          manifest=$(grep -oPm1 '"version"\s*:\s*"\K[^"]+' src/OC.AutoLink/wwwroot/umbraco-package.json)
+          [ "$manifest" = "$csproj" ] || { echo "umbraco-package.json declares $manifest"; exit 1; }
+          for v in $(grep -oP '\?v=\K[^"]+' src/OC.AutoLink/wwwroot/umbraco-package.json); do
+            [ "$v" = "$csproj" ] || { echo "an asset path is cache-busted with ?v=$v"; exit 1; }
+          done
+
+      # The Marketplace reads this from the default branch root, so a typo here is only visible on the listing.
+      - name: Check the Marketplace listing file parses
+        run: python3 -c "import json; json.load(open('umbraco-marketplace.json'))"
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
@@ -37,6 +54,9 @@ jobs:
           unzip -l artifacts/*.nupkg
           unzip -l artifacts/*.nupkg | grep -q 'staticwebassets/umbraco-package.json' || { echo 'The backoffice manifest is missing from the package'; exit 1; }
           unzip -l artifacts/*.nupkg | grep -q 'staticwebassets/autolink-keywords.js' || { echo 'The dashboard is missing from the package'; exit 1; }
+          unzip -l artifacts/*.nupkg | grep -q 'lib/net10.0/OC.AutoLink.xml' || { echo 'The XML docs are missing, so AutoLinkOptions ships without its comments'; exit 1; }
+          unzip -l artifacts/*.nupkg | grep -q 'README.md' || { echo 'The README is missing, so nuget.org has no landing page'; exit 1; }
+          unzip -l artifacts/*.nupkg | grep -q 'ocAutolink.png' || { echo 'The icon is missing, so both listings fall back to a placeholder'; exit 1; }
 
       - uses: actions/upload-artifact@v4
         with:

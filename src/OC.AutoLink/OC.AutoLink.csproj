@@ -6,12 +6,17 @@
     <Nullable>enable</Nullable>
     <!-- This project sits outside Autolink/, so it does not pick up that folder's Directory.Packages.props -->
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
-    <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <!-- Razor SDK so wwwroot/ ships as static web assets. The base path is where the host app serves them
          from, which is what makes Umbraco's package manifest scan find umbraco-package.json. -->
     <StaticWebAssetBasePath>App_Plugins/OC.AutoLink</StaticWebAssetBasePath>
     <!-- Warnings are errors here: this is a package, and a warning that ships is a warning nobody reads. -->
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Ship the XML docs. The comments on AutoLinkOptions in particular are the documentation for the only
+         part of this a consumer configures, and without the file none of them reach their IntelliSense.
+         CS1591 is excluded rather than answered: it fires on ninety-odd DI constructors and interface
+         implementations, and a comment written only to silence it is worse than no comment. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup Label="Package">
@@ -20,14 +25,11 @@
     <Authors>Owain Williams</Authors>
     <Company>Owain Williams</Company>
     <Title>OC.AutoLink for Umbraco</Title>
-    <Description>
-      Turns keyword mentions in Umbraco rich text into links to the corresponding page, at render time, with no
-      editor action required. Stored markup is never modified, so an article picks up a link the day somebody adds
-      the keyword. Keywords live in a backoffice section of their own rather than on your document types, and point
-      at a page or an external URL through Umbraco's Multi URL Picker. Shows which pages carry links and lets
-      individual ones be switched off. Multilingual.
-    </Description>
+    <!-- One line on purpose. MSBuild keeps the newlines and indentation of a wrapped value, and nuget.org
+         renders the result as a code block. The detail belongs in the README, which is packed below. -->
+    <Description>Turns keyword mentions in Umbraco rich text into links to the corresponding page, at render time, with no editor action required. Stored markup is never modified, so an article picks up a link the day somebody adds the keyword. Keywords live in a backoffice section of their own rather than on your document types, and point at a page or an external URL through Umbraco's Multi URL Picker. Shows which pages carry links and lets individual ones be switched off. Multilingual.</Description>
     <PackageTags>umbraco;umbraco-marketplace;seo;internal-linking;rich-text</PackageTags>
+    <PackageReleaseNotes>First release. Built and verified against Umbraco 17.6.1 on .NET 10.</PackageReleaseNotes>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/OwainWilliams/OC.AutoLink</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -37,15 +39,23 @@
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <GenerateRepositoryUrlAttribute>true</GenerateRepositoryUrlAttribute>
+    <PackageIcon>ocAutolink.png</PackageIcon>
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Both pack to the root of the nupkg, which is what PackageReadmeFile and PackageIcon expect. Neither is
+         a static web asset: they are listing metadata for nuget.org and the Marketplace, not files a site serves. -->
     <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="ocAutolink.png" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Umbraco.Cms.Web.Website" Version="17.6.1" />
-    <PackageReference Include="Umbraco.Cms.Api.Management" Version="17.6.1" />
+    <!-- A floor and a ceiling, not just a floor. A PackageReference version is a minimum, so a bare 17.6.1
+         lets NuGet resolve this happily against Umbraco 18 and the site then fails at runtime rather than at
+         restore. Umbraco majors are breaking, so say where support ends and let restore be the one to complain. -->
+    <PackageReference Include="Umbraco.Cms.Web.Website" Version="[17.6.1, 18)" />
+    <PackageReference Include="Umbraco.Cms.Api.Management" Version="[17.6.1, 18)" />
+    <!-- Flows to consumers as a public dependency, which is deliberate: the HTML walk is the package. -->
     <PackageReference Include="AngleSharp" Version="1.7.1" />
   </ItemGroup>
 
