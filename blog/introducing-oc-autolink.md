@@ -16,13 +16,13 @@ The part I care about most is that it works backwards in time. Write the sentenc
 
 ## The one decision everything hangs off
 
-That backwards in time trick comes from a single choice: the links are added when a page is served, not when it's saved.
+That comes from a single choice: the links are added when a page is served, not when it's saved.
 
 If you're newer to CMS development, here's the distinction. When an editor hits publish, Umbraco stores their content in the database. Later, when a visitor requests the page, that stored content gets turned into the HTML that goes out. Those are two different moments, and you can do work at either one.
 
 Doing the work at publish time sounds tidy. Find the keywords, insert the links, store the result, done once. But it means the links are frozen at whatever the keywords were on the day the editor pressed the button. A new keyword doesn't reach old posts unless you republish all of them. Deleting a target page leaves dead links sat in the database. And editors open their own content and find anchor tags in it they never typed, which I wouldn't like on my own posts and I don't think anyone else would either.
 
-Doing the work at render time means the stored content is never touched. The links are worked out fresh every time the page goes out, so they can't be stale, they can't be orphaned, and there's nothing to clean up. That's the whole design in one sentence.
+Doing the work at render time means the stored content is never touched. The links are worked out fresh every time the page goes out, so they can't be stale, they can't be orphaned, and there's nothing to clean up.
 
 There was also a reason specific to me. I have packages that post to Mastodon, Bluesky and LinkedIn when I publish something. A publish time approach would have meant republishing two hundred posts to backfill one new keyword, which is six hundred social posts from a single change. If a feature needs a flag to stop it spamming everyone I know, it's in the wrong place.
 
@@ -63,8 +63,6 @@ There's also an audit. Because nothing is stored, "which pages have auto-links o
 ## Is it fast enough
 
 Fair question, given it parses HTML on every page view. I measured it on a page with eight rich text blocks: 6.57 milliseconds per request with the feature off, 7.69 with it on. About a millisecond. I nearly built a caching layer before checking, and I'm glad I checked, because the cache would have added complexity and a whole new class of stale page bugs to save one millisecond.
-
-Measure first. Every time I've skipped that step, the thing I was worried about turned out to be fine and the real problem was somewhere I hadn't looked.
 
 ## Go and have a look
 
