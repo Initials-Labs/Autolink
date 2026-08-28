@@ -10,7 +10,7 @@ keyword `Claude AI` points at a page, the phrase renders as a link to that page.
 editor did nothing, and nothing was added to their document type — keywords are curated
 centrally, in the Auto-linking section (decision 8).
 
-Working package name: `OC.AutoLink` (core), with an optional `OC.AutoLink.Automate`
+Working package name: `Initials.AutoLink` (core), with an optional `Initials.AutoLink.Automate`
 for side effects. Tentative, not yet committed to.
 
 ---
@@ -71,7 +71,7 @@ so nothing can be contested and the whole conflict subsystem was deleted. The pr
 just enforced by a unique index now instead of by reporting. Keep the principle in mind if a second source of
 keywords is ever proposed: it would bring the collisions back with it.
 
-Rows live in `ocAutoLinkKeywordMapping` (real `MigrationPlan`) and store the **target key rather than a URL**, so a
+Rows live in `initialsAutoLinkKeywordMapping` (real `MigrationPlan`) and store the **target key rather than a URL**, so a
 page that moves still resolves. Several keywords may point at one page, which is how synonyms and plurals are
 expressed.
 
@@ -88,7 +88,7 @@ were never there.
 What the scan cannot answer is what was *served* historically. If that is ever wanted, relations written as pages
 render are still the right answer, and they remain unbuilt.
 
-Suppressions (`ocAutoLinkSuppression`) work at two levels, one page plus one keyword, or a keyword everywhere.
+Suppressions (`initialsAutoLinkSuppression`) work at two levels, one page plus one keyword, or a keyword everywhere.
 Suppressed keywords keep reserving their span so switching one off cannot promote a shorter overlapping keyword.
 
 ### 6. Keywords are per culture, not per site
@@ -206,7 +206,7 @@ Only `AutoLinkComposer` still relies on being publicly scanned. Do not make it i
 
 ### Keyword registry
 
-Rows in `ocAutoLinkKeywordMapping`, edited on the Auto-linking screen. Each row is a
+Rows in `initialsAutoLinkKeywordMapping`, edited on the Auto-linking screen. Each row is a
 keyword, a culture, and either a page key or an absolute URL. There is no second source
 — see decision 8. The only page-level property left is the
 `excludeFromAutoLinking` boolean, for pages that shouldn't be *scanned*.
@@ -297,7 +297,7 @@ Rules to encode:
 Three spikes. Total estimate **1–2 focused days**. Risk is concentrated in Spike 0 and
 is binary, not gradual.
 
-> **All three spikes pass.** Built in `src/OC.AutoLink/`, verified on the Clean site in `Autolink/`.
+> **All three spikes pass.** Built in `src/Initials.AutoLink/`, verified on the Clean site in `Autolink/`.
 > See `docs/build-log.md` for evidence and measurements.
 >
 > Spike 0 turned out to be a stronger test than planned: Clean has **no top-level RTE property on `article`

@@ -1,4 +1,4 @@
-# OC.AutoLink technical specification
+# Initials.AutoLink technical specification
 
 A developer's map of the package: what each piece does, how a request flows through it, what is
 stored where, and which behaviours are load bearing.
@@ -301,7 +301,7 @@ variant and invariant content.
 
 ## 6. Data model
 
-### 6.1 `ocAutoLinkKeywordMapping`
+### 6.1 `initialsAutoLinkKeywordMapping`
 
 The only source of keywords.
 
@@ -326,7 +326,7 @@ The keyword is stored twice on purpose. `keywordKey` is lower-cased and carries 
 uniqueness behaves the same on SQLite (case-sensitive text by default) as on SQL Server (usually
 not). `keyword` preserves what somebody typed.
 
-### 6.2 `ocAutoLinkSuppression`
+### 6.2 `initialsAutoLinkSuppression`
 
 | Column | Type | Notes |
 |---|---|---|
@@ -378,7 +378,7 @@ Two plans, because they answer independent questions. Executed from
 `AutoLinkMigrationHandler` on `UmbracoApplicationStartedNotification`, only at
 `RuntimeLevel.Run`, each wrapped so a failure logs rather than stopping boot.
 
-### `AutoLinkMigrationPlan` ("OC.AutoLink") - every install
+### `AutoLinkMigrationPlan` ("Initials.AutoLink") - every install
 
 | Step state | Class | Does |
 |---|---|---|
@@ -386,7 +386,7 @@ Two plans, because they answer independent questions. Executed from
 | `autolink-keyword-suppression-table` | `AddKeywordSuppressionTable` | Creates the suppression table |
 | `autolink-decisions-culture` | `AddCultureToDecisions` | Adds `culture` to both tables |
 | `autolink-external-links` | `AddExternalLinkColumns` | Adds `externalUrl`, `label`, `nofollow` |
-| `autolink-relation-type` | `AddKeywordRelationType` | Creates the `ocAutoLinkKeyword` relation type |
+| `autolink-relation-type` | `AddKeywordRelationType` | Creates the `initialsAutoLinkKeyword` relation type |
 | `autolink-remove-legacy-keyword-property` | `RemoveLegacyKeywordProperty` | Removes the obsolete `linkKeywords` property and datatype |
 
 The two column-adding steps **rebuild rather than alter**. Umbraco's migration layer refuses
@@ -394,7 +394,7 @@ The two column-adding steps **rebuild rather than alter**. Umbraco's migration l
 describing the old shape, drop the table, `Create.Table<CurrentDto>()` (which brings the new column
 and rebuilt index), insert the rows back. Lossless and provider independent.
 
-### `AutoLinkSchemaMigrationPlan` ("OC.AutoLink.Schema") - opt in
+### `AutoLinkSchemaMigrationPlan` ("Initials.AutoLink.Schema") - opt in
 
 | Step state | Class | Does |
 |---|---|---|
@@ -432,7 +432,7 @@ as designed, but the damage is invisible at the moment somebody does it.
 
 The approach is to register the facts with Umbraco and let its own UI do the warning.
 
-`AutoLinkRelation.Alias` is `ocAutoLinkKeyword`, created with `isDependency: true`. Dependency
+`AutoLinkRelation.Alias` is `initialsAutoLinkKeyword`, created with `isDependency: true`. Dependency
 relations are what Umbraco's tracked references read, so the delete confirmation grows "The
 following items depend on this" and the Info tab grows a "Referenced by" panel, with no UI of ours.
 
@@ -587,11 +587,11 @@ keyword at 255 characters to match the column, and normalises an external URL th
 
 Two policies, registered in the composer:
 
-- `OC.AutoLink.SectionAccess` on `AutoLinkControllerBase`, requiring the
-  `OC.AutoLink.Section` grant. Umbraco's own `SectionAccess*` policies are built on an `internal`
+- `Initials.AutoLink.SectionAccess` on `AutoLinkControllerBase`, requiring the
+  `Initials.AutoLink.Section` grant. Umbraco's own `SectionAccess*` policies are built on an `internal`
   requirement type, so `SectionAccessRequirement` and `SectionAccessHandler` are a small
   reimplementation over the public `IAuthorizationHelper` and `IUser.AllowedSections`.
-- `OC.AutoLink.Teardown` additionally requiring an administrator, on the data controller only.
+- `Initials.AutoLink.Teardown` additionally requiring an administrator, on the data controller only.
   Both apply, so the administrator doing a teardown also needs the section.
 
 > **Trap worth knowing:** using `AuthorizationPolicies.BackOfficeAccess` on a custom management API
@@ -639,11 +639,11 @@ Notable points:
 
 ## 13. Configuration
 
-Bound from `OC:AutoLink` through `IOptionsMonitor`, so edits apply without a restart.
+Bound from `Initials:AutoLink` through `IOptionsMonitor`, so edits apply without a restart.
 
 ```json
 {
-  "OC": {
+  "Initials": {
     "AutoLink": {
       "Enabled": true,
       "ExcludePropertyAlias": "excludeFromAutoLinking",
@@ -694,7 +694,7 @@ Everything degrades toward "renders unlinked" rather than "throws".
 
 ## 15. Tests
 
-54 tests in `tests/OC.AutoLink.Tests`, xUnit and NSubstitute.
+54 tests in `tests/Initials.AutoLink.Tests`, xUnit and NSubstitute.
 
 | File | Covers |
 |---|---|

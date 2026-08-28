@@ -1,10 +1,10 @@
-# OC.AutoLink build log
+# Initials.AutoLink build log
 
 How the package was built and verified: what was tried, what fought back, and what the numbers came out at.
 
 Built and verified against **Umbraco 17.6.1 / .NET 10**.
 
-Companion documents: `src/OC.AutoLink/README.md` is what a consumer reads on nuget.org,
+Companion documents: `src/Initials.AutoLink/README.md` is what a consumer reads on nuget.org,
 `docs/technical-spec.md` is the developer's map of the code, and `CLAUDE.md` holds the design decisions
 with the rejected alternatives.
 
@@ -82,7 +82,7 @@ not delegating it would have silently regressed it rather than leaving it alone.
 `KeywordRegistry` is a singleton holding a `KeywordSnapshot`: the keyword to target lookup, one compiled
 `Regex`, and a content stamp.
 
-Keywords come from one place: the rows in `ocAutoLinkKeywordMapping`. A row names a keyword, a culture, and
+Keywords come from one place: the rows in `initialsAutoLinkKeywordMapping`. A row names a keyword, a culture, and
 either a page key or an absolute URL. There is no second source, which is what makes the whole build a loop over
 rows rather than a reconciliation between two of them.
 
@@ -169,7 +169,7 @@ unresolved keyword is a broken row to repair, not a decision to hold ground for.
 
 ### 6. Storage, API and backoffice section
 
-`ocAutoLinkKeywordMapping`, created by a real `MigrationPlan` (`AutoLinkMigrationPlan`) rather than a startup
+`initialsAutoLinkKeywordMapping`, created by a real `MigrationPlan` (`AutoLinkMigrationPlan`) rather than a startup
 fixup — the table is where the keywords live, so it is not something to recreate opportunistically. The keyword is
 stored twice: `keywordKey` lower-cased carrying the unique index, so uniqueness behaves the same on SQLite
 (case-sensitive text by default) as on SQL Server, and `keyword` preserving the casing somebody typed for display.
@@ -284,7 +284,7 @@ post: the report showed two rows where the site was actually linking on ten.
 
 ### 8. Suppression: switching a link off
 
-`ocAutoLinkSuppression`, added by the second migration in the plan. Two levels, one table:
+`initialsAutoLinkSuppression`, added by the second migration in the plan. Two levels, one table:
 
 - **This page, this keyword** — the mention on that article stops being a link, everywhere else is untouched.
   Checked in `AutoLinker`, which already knows the current page key.
@@ -352,7 +352,7 @@ Portable across providers, and lossless.
 ### 10. External links
 
 A keyword can point at a URL outside the site. This is not a second feature bolted alongside the mapping table: it
-is the **same row**. `ocAutoLinkKeywordMapping` gained a nullable `externalUrl` beside the nullable `targetKey`,
+is the **same row**. `initialsAutoLinkKeywordMapping` gained a nullable `externalUrl` beside the nullable `targetKey`,
 exactly one of which is meaningful, because "somebody chose where this keyword goes" is one concept whether the
 destination is a node or a URL.
 
@@ -444,7 +444,7 @@ Keywords made it easy to break a page without noticing: delete the page a keywor
 it silently stops, which is the flip side of decision 1 working as designed. Umbraco already has the machinery to
 warn about that — it just needs telling.
 
-`ocAutoLinkKeyword` is a relation type with **`isDependency: true`**, created by a migration on the main plan. That
+`initialsAutoLinkKeyword` is a relation type with **`isDependency: true`**, created by a migration on the main plan. That
 one flag is the whole feature: Umbraco's tracked references read dependency relations, so the Info tab grows a
 "Referenced by" list and the delete confirmation grows **"The following items depend on this"**, naming the pages
 that would lose links. No UI of ours involved.
@@ -664,7 +664,7 @@ is fast enough that a stamp-keyed `IAppPolicyCache` is not worth the complexity 
 
 ```json
 {
-  "OC": {
+  "Initials": {
     "AutoLink": {
       "Enabled": true,
       "ExcludePropertyAlias": "excludeFromAutoLinking",
@@ -707,7 +707,7 @@ Removing the properties takes their stored values with them. It does **not** cle
 group survive with no relationships pointing at them, which is ordinary Umbraco behaviour — core has no notion of
 collecting unused tags — and they are inert, since nothing queries that group any more.
 
-It is a **migration**, in its own `OC.AutoLink.Schema` plan, so it runs **once** rather than at every startup. That
+It is a **migration**, in its own `Initials.AutoLink.Schema` plan, so it runs **once** rather than at every startup. That
 was the last startup-fixup left in the package, and it was the wrong shape for a shipping one: editing somebody's
 document types every time their site boots is nobody's expectation.
 
@@ -860,7 +860,7 @@ None of it has been through an actual screen reader. Sound structure, unverified
 ### Localisation
 
 Every string the screen shows lives in `wwwroot/lang/en.js`, and the element asks for terms through
-`this.localize.term('ocAutoLink_alias')`. Section and dashboard names use the `#ocAutoLink_alias` convention in the
+`this.localize.term('initialsAutoLink_alias')`. Section and dashboard names use the `#initialsAutoLink_alias` convention in the
 manifest, the same way core does.
 
 To add a language: copy the file, translate the values, and register it with its own culture. Nothing else changes.

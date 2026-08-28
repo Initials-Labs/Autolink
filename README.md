@@ -1,4 +1,4 @@
-# OC.AutoLink
+# Initials.AutoLink
 
 An Umbraco 17 package that turns keyword mentions in Rich Text Editor content into links to the corresponding
 page, **at render time**, with no editor action required.
@@ -15,12 +15,11 @@ editor to fill in per page.
 
 | Path | What it is |
 |---|---|
-| `src/OC.AutoLink/` | The package. Its [README](src/OC.AutoLink/README.md) is what a consumer reads on nuget.org: install it, grant the section, add a keyword. |
+| `src/Initials.AutoLink/` | The package. Its [README](src/Initials.AutoLink/README.md) is what a consumer reads on nuget.org: install it, grant the section, add a keyword. |
 | `Autolink/` | An Umbraco 17 site with the Clean starter kit, used to build and verify it. |
-| `tests/OC.AutoLink.Tests/` | Unit tests over the linker and the resolution rules. |
+| `tests/Initials.AutoLink.Tests/` | Unit tests over the linker and the resolution rules. |
 | `docs/technical-spec.md` | A developer's map of the code: component by component, the render path, the data model, the migrations. |
 | `docs/build-log.md` | How it was built and verified — evidence, measurements and the v17 traps. |
-| `blog/` | Three-part write-up, drafted. |
 | `CLAUDE.md` | The design decisions and why the rejected alternatives were rejected. |
 | `umbraco-marketplace.json` | Listing metadata. The Marketplace reads it from this branch's root, so it has to stay here. |
 

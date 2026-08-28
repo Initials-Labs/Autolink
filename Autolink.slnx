@@ -1,5 +1,5 @@
 <Solution>
   <Project Path="Autolink/Autolink.csproj" />
-  <Project Path="src/OC.AutoLink/OC.AutoLink.csproj" />
-  <Project Path="tests/OC.AutoLink.Tests/OC.AutoLink.Tests.csproj" />
+  <Project Path="src/Initials.AutoLink/Initials.AutoLink.csproj" />
+  <Project Path="tests/Initials.AutoLink.Tests/Initials.AutoLink.Tests.csproj" />
 </Solution>

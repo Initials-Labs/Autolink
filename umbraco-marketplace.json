@@ -5,8 +5,8 @@
   "AlternateCategory": "Campaign & Marketing",
   "LicenseTypes": [ "Free" ],
   "Tags": [ "SEO", "internal linking", "rich text", "multilingual", "render time" ],
-  "DocumentationUrl": "https://github.com/OwainWilliams/OC.AutoLink/blob/main/docs/technical-spec.md",
-  "IssueTrackerUrl": "https://github.com/OwainWilliams/OC.AutoLink/issues",
+  "DocumentationUrl": "https://github.com/Initials-Labs/Autolink/blob/main/docs/technical-spec.md",
+  "IssueTrackerUrl": "https://github.com/Initials-Labs/Autolink/issues",
   "AuthorDetails": {
     "Name": "Owain Williams",
     "SyncContributorsFromRepository": true

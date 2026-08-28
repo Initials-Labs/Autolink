@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\src\OC.AutoLink\OC.AutoLink.csproj" />
+    <ProjectReference Include="..\src\Initials.AutoLink\Initials.AutoLink.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
