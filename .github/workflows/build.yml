@@ -28,8 +28,10 @@ jobs:
           done
 
       # The Marketplace reads this from the default branch root, so a typo here is only visible on the listing.
-      - name: Check the Marketplace listing file parses
-        run: python3 -c "import json; json.load(open('umbraco-marketplace.json'))"
+      # Validated against the real schema, not just parsed: a misspelt Category is well-formed JSON that the
+      # Marketplace quietly ignores.
+      - name: Check the Marketplace listing file against the schema
+        run: pipx run check-jsonschema --schemafile https://marketplace.umbraco.com/umbraco-marketplace-schema.json umbraco-marketplace.json
 
       - uses: actions/setup-dotnet@v4
         with:

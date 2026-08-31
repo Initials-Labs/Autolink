@@ -1,0 +1,69 @@
+name: release
+
+# Publishing is a tag push, nothing else. A tag is deliberate in a way a branch push is not, and it leaves the
+# release commit pointed at from the repo history. Tag v0.1.0 to ship 0.1.0.
+on:
+  push:
+    tags:
+      - 'v*'
+
+# id-token lets the job mint a GitHub OIDC token, which nuget.org's trusted publishing policy exchanges for a
+# short-lived push key. No long-lived secret exists to leak or expire.
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The tag is the human's claim about what is shipping and the csproj is what actually ships. If they
+      # disagree, stop before anything is built: nuget.org versions are immutable, so a mispush of 0.2.0
+      # content under an 0.1.1 tag can only be unlisted, never fixed.
+      - name: Check the tag matches the csproj version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          csproj=$(grep -oPm1 '(?<=<Version>)[^<]+' src/Initials.AutoLink/Initials.AutoLink.csproj)
+          [ "$tag" = "$csproj" ] || { echo "Tag says $tag but the csproj declares $csproj"; exit 1; }
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore Autolink.slnx
+
+      - name: Build
+        run: dotnet build Autolink.slnx --no-restore -c Release
+
+      # The build workflow ran the same tests on the same commit, but that is a race, not a guarantee: the tag
+      # can be pushed before that run finishes, or on a commit whose run was never green.
+      - name: Test
+        run: dotnet test tests/Initials.AutoLink.Tests/Initials.AutoLink.Tests.csproj --no-build -c Release
+
+      - name: Pack
+        run: dotnet pack src/Initials.AutoLink/Initials.AutoLink.csproj --no-build -c Release -o artifacts
+
+      # Exchanges this job's OIDC token for a short-lived nuget.org API key, under the trusted publishing
+      # policy on the account below. The policy names this repo and this workflow file, so renaming
+      # release.yml means updating the policy too or the exchange starts failing with 403s.
+      - name: Get a short-lived key from nuget.org
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: initials-labs
+
+      # Pushing the nupkg pushes the snupkg beside it automatically, so one command ships both. skip-duplicate
+      # makes a rerun of a half-failed release safe rather than an error on the package that did land.
+      - name: Push to nuget.org
+        run: dotnet nuget push "artifacts/*.nupkg" --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nupkg
+          path: |
+            artifacts/*.nupkg
+            artifacts/*.snupkg
