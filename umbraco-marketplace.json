@@ -1,0 +1,14 @@
+{
+  "$schema": "https://marketplace.umbraco.com/umbraco-marketplace-schema.json",
+  "PackageType": "Package",
+  "Category": "Editor Tools",
+  "AlternateCategory": "Campaign & Marketing",
+  "LicenseTypes": [ "Free" ],
+  "Tags": [ "SEO", "internal linking", "rich text", "multilingual", "render time" ],
+  "DocumentationUrl": "https://github.com/Initials-Labs/Autolink/blob/main/docs/technical-spec.md",
+  "IssueTrackerUrl": "https://github.com/Initials-Labs/Autolink/issues",
+  "AuthorDetails": {
+    "Name": "Owain Williams",
+    "SyncContributorsFromRepository": true
+  }
+}

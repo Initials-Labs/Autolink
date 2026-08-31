@@ -1,0 +1,33 @@
+## .NET build output
+[Bb]in/
+[Oo]bj/
+artifacts/
+*.user
+*.suo
+*.userprefs
+.vs/
+.vscode/
+
+## Umbraco runtime state
+# The database, logs and caches are per-machine. The demo is reproducible from empty:
+# unattended install brings up the site, Clean supplies the content and media, and
+# AutoLinkSchemaInstaller adds the keyword property to the document types.
+**/umbraco/Data/
+**/umbraco/Logs/
+**/umbraco/mediacache/
+**/umbraco/models/
+**/umbraco/preview/
+**/umbraco/TEMP/
+
+## Media uploaded or installed at runtime
+**/wwwroot/media/
+
+## Packaging output
+artifacts/
+
+## Front end tooling, if it ever grows one
+node_modules/
+
+## OS noise
+.DS_Store
+Thumbs.db
