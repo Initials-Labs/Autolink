@@ -48,13 +48,15 @@ jobs:
         run: dotnet pack src/Initials.AutoLink/Initials.AutoLink.csproj --no-build -c Release -o artifacts
 
       # Exchanges this job's OIDC token for a short-lived nuget.org API key, under the trusted publishing
-      # policy on the account below. The policy names this repo and this workflow file, so renaming
-      # release.yml means updating the policy too or the exchange starts failing with 403s.
+      # policy on the account below. user is the person who CREATED the policy, not the initials-labs org
+      # that owns the package — nuget.org resolves the policy by its creator and 401s on the org name.
+      # The policy also names this repo and this workflow file, so renaming release.yml means updating
+      # the policy too or the exchange starts failing.
       - name: Get a short-lived key from nuget.org
         id: nuget-login
         uses: NuGet/login@v1
         with:
-          user: initials-labs
+          user: scottishcoder
 
       # Pushing the nupkg pushes the snupkg beside it automatically, so one command ships both. skip-duplicate
       # makes a rerun of a half-failed release safe rather than an error on the package that did land.
