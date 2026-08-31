@@ -21,7 +21,7 @@
 
   <PropertyGroup Label="Package">
     <PackageId>Initials.AutoLink</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.1.0-alpha001</Version>
     <Authors>Owain Williams</Authors>
     <Company>Owain Williams</Company>
     <Title>Initials.AutoLink for Umbraco</Title>
@@ -29,7 +29,7 @@
          renders the result as a code block. The detail belongs in the README, which is packed below. -->
     <Description>Turns keyword mentions in Umbraco rich text into links to the corresponding page, at render time, with no editor action required. Stored markup is never modified, so an article picks up a link the day somebody adds the keyword. Keywords live in a backoffice section of their own rather than on your document types, and point at a page or an external URL through Umbraco's Multi URL Picker. Shows which pages carry links and lets individual ones be switched off. Multilingual.</Description>
     <PackageTags>umbraco;umbraco-marketplace;seo;internal-linking;rich-text</PackageTags>
-    <PackageReleaseNotes>First release. Built and verified against Umbraco 17.6.1 on .NET 10.</PackageReleaseNotes>
+    <PackageReleaseNotes>First alpha release. Built and verified against Umbraco 17.6.1 on .NET 10.</PackageReleaseNotes>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/Initials-Labs/Autolink</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
