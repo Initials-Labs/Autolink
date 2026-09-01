@@ -34,6 +34,23 @@ internal sealed class AddKeywordRelationType : AsyncMigrationBase
             return Task.CompletedTask;
         }
 
+        // umbracoRelationType has a unique index on name as well as alias. A foreign relation type carrying our
+        // display name would fail that index, and a failed migration re-runs on every boot — so a name collision
+        // is reported and skipped, not thrown. Dependency warnings then stay off until the collision is resolved,
+        // which is the honest outcome: that relation type is not ours to adopt or to rename.
+        if (_relationService.GetAllRelationTypes()
+                .FirstOrDefault(t => t.Name == AutoLinkRelation.Name) is { } collision)
+        {
+            Logger.LogWarning(
+                "A relation type named '{Name}' already exists with alias {ExistingAlias}, so the {Alias} relation "
+                + "type was not created and pages carrying auto-links will not be tracked as dependencies. Rename or "
+                + "remove the existing relation type and restart to enable dependency tracking.",
+                AutoLinkRelation.Name,
+                collision.Alias,
+                AutoLinkRelation.Alias);
+            return Task.CompletedTask;
+        }
+
         var relationType = new RelationType(
             AutoLinkRelation.Name,
             AutoLinkRelation.Alias,
