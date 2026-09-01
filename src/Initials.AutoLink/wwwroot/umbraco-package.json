@@ -16,8 +16,8 @@
     {
       "type": "localization",
       "alias": "Initials.AutoLink.Localization.engb",
-      "name": "Auto-link English (en-gb)",
-      "js": "/App_Plugins/Initials.AutoLink/lang/en.js?v=0.1.0-alpha002",
+      "name": "Autolink English (en-gb)",
+      "js": "/App_Plugins/Initials.AutoLink/lang/en.js?v=0.1.0-alpha003",
       "meta": {
         "culture": "en-gb"
       }
@@ -25,8 +25,8 @@
     {
       "type": "localization",
       "alias": "Initials.AutoLink.Localization.en",
-      "name": "Auto-link English (en)",
-      "js": "/App_Plugins/Initials.AutoLink/lang/en.js?v=0.1.0-alpha002",
+      "name": "Autolink English (en)",
+      "js": "/App_Plugins/Initials.AutoLink/lang/en.js?v=0.1.0-alpha003",
       "meta": {
         "culture": "en"
       }
@@ -44,8 +44,8 @@
     {
       "type": "dashboard",
       "alias": "Initials.AutoLink.Dashboard.Keywords",
-      "name": "Auto-link keywords dashboard",
-      "element": "/App_Plugins/Initials.AutoLink/autolink-keywords.js?v=0.1.0-alpha002",
+      "name": "Autolink keywords dashboard",
+      "element": "/App_Plugins/Initials.AutoLink/autolink-keywords.js?v=0.1.0-alpha003",
       "weight": 10,
       "meta": {
         "label": "#initialsAutoLink_dashboardName",
