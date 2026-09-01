@@ -412,7 +412,7 @@ links can be audited or stripped wholesale if search engines get grumpy.
 
 - Umbraco 17, .NET / C#
 - Razor Class Library packaging via `StaticWebAssetBasePath` if this becomes a package
-- PRs follow the org `git-pr-standards` skill: branch `type/jiraNumber-description`,
-  Conventional Commits, PR title prefixes `[FEAT]` / `[BUG]` etc.
+- Branches are `type/description` — this is a personal project with no Jira, so no ticket
+  number in the name. Conventional Commits, PR title prefixes `[FEAT]` / `[BUG]` etc.
 - Blog write-up is intended. Casual conversational tone, no em dashes. Working angle:
   "I built an auto-linker and here's why I didn't use Examine."

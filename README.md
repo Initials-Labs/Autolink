@@ -50,6 +50,16 @@ administrators.
 The screen shows both halves of every keyword — where it links to, and the pages that mention it — and is where you
 add keywords, change where one points, and switch individual links off.
 
-## Conventions
+## Contributing
 
-Branches `type/jiraNumber-description`, Conventional Commits, PR titles prefixed `[FEAT]` / `[BUG]`.
+Issues and pull requests are welcome, at [Initials-Labs/Autolink](https://github.com/Initials-Labs/Autolink/issues).
+
+- Branches are `type/description` — `feat/markdown-support`, `bug/scan-culture-filter`. There is no issue tracker
+  number to carry in the name.
+- Commits follow [Conventional Commits](https://www.conventionalcommits.org/), PR titles are prefixed
+  `[FEAT]` / `[BUG]` and the like.
+- `dotnet build Autolink.slnx` must come out clean — the package treats warnings as errors — and
+  `dotnet test tests/Initials.AutoLink.Tests/Initials.AutoLink.Tests.csproj` must pass.
+- Anything touching the composer, the migrations or the value converters should also be checked on the running
+  site in `Autolink/`. Umbraco discovers those by reflection and DI, so getting them wrong compiles fine and
+  fails silently — `docs/build-log.md` records what to look for.
