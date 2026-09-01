@@ -4,6 +4,7 @@ on:
   # Every branch, not just main: a feature branch that only gets validated once a pull request exists is a feature
   # branch nobody is checking.
   push:
+    branches: ['**']
   pull_request:
   workflow_dispatch:
 
