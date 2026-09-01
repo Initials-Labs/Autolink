@@ -49,9 +49,15 @@ internal static class AutoLinkScanSkipReason
 /// <param name="Url">Its relative URL in this culture.</param>
 /// <param name="Culture">Culture this row is for, empty on an invariant site.</param>
 /// <param name="Placements">Links it would carry, suppressed ones included and flagged.</param>
+/// <param name="VariesByCulture">
+/// Whether the document varies by culture, which decides the variant segment of its backoffice edit URL —
+/// <see cref="Culture"/> is the culture the scan rendered, not the variant id, and an invariant document's
+/// workspace only opens on the literal <c>invariant</c>.
+/// </param>
 public sealed record ScannedPage(
     Guid PageKey,
     string Name,
     string Url,
     string Culture,
-    IReadOnlyList<AutoLinkPlacement> Placements);
+    IReadOnlyList<AutoLinkPlacement> Placements,
+    bool VariesByCulture = false);

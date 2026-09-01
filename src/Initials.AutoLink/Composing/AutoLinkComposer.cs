@@ -44,9 +44,10 @@ public sealed class AutoLinkComposer : IComposer
         // than a collection builder: UsageInformationService takes IEnumerable<IDetailedTelemetryProvider>.
         builder.Services.AddTransient<IDetailedTelemetryProvider, AutoLinkTelemetryProvider>();
 
-        // Replacing the built-in converter removes it from the collection, and with it its DI registration.
-        // Register it explicitly so the wrapper can still resolve and delegate to it.
+        // Replacing a built-in converter removes it from the collection, and with it its DI registration.
+        // Register them explicitly so the wrappers can still resolve and delegate to them.
         builder.Services.AddTransient<RteBlockRenderingValueConverter>();
+        builder.Services.AddTransient<MarkdownEditorValueConverter>();
 
         // Umbraco registers a policy per built-in section; ours needs registering the same way, with the same
         // requirement type its own section policies use, so access follows the user group section grant.
@@ -77,6 +78,8 @@ public sealed class AutoLinkComposer : IComposer
 
         builder.PropertyValueConverters()
             .Replace<RteBlockRenderingValueConverter, AutoLinkRichTextValueConverter>();
+        builder.PropertyValueConverters()
+            .Replace<MarkdownEditorValueConverter, AutoLinkMarkdownValueConverter>();
 
         // One startup handler, two plans: the decision tables, and the optional keyword schema. See
         // AutoLinkMigrationHandler for why the second is conditional.

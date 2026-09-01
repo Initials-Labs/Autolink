@@ -39,13 +39,14 @@ internal sealed class AutoLinkScanner : IAutoLinkScanner
     private const int MaxBlockDepth = 10;
 
     /// <summary>
-    /// Property editors worth converting: rich text itself, and the block editors that can contain it. Converting
-    /// every property on every page instead means resolving media, pickers and the rest, which is most of the cost
-    /// of a scan and none of the value.
+    /// Property editors worth converting: the editors whose converters we wrap, and the block editors that can
+    /// contain them. Converting every property on every page instead means resolving media, pickers and the rest,
+    /// which is most of the cost of a scan and none of the value.
     /// </summary>
     private static readonly HashSet<string> ScannableEditors = new(StringComparer.OrdinalIgnoreCase)
     {
         Constants.PropertyEditors.Aliases.RichText,
+        Constants.PropertyEditors.Aliases.MarkdownEditor,
         Constants.PropertyEditors.Aliases.BlockList,
         Constants.PropertyEditors.Aliases.BlockGrid,
     };
@@ -160,7 +161,8 @@ internal sealed class AutoLinkScanner : IAutoLinkScanner
 
                 if (placements.Count > 0)
                 {
-                    pages.Add(new ScannedPage(page.Key, page.Name, url, culture, placements));
+                    pages.Add(new ScannedPage(
+                        page.Key, page.Name, url, culture, placements, page.ContentType.VariesByCulture()));
                 }
             }
         }
