@@ -11,6 +11,7 @@ using Umbraco.Cms.Core.Models.PublishedContent;
 using Umbraco.Cms.Core.Routing;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Web;
+using Umbraco.Extensions;
 
 namespace Initials.AutoLink.Registry;
 
@@ -267,7 +268,13 @@ internal sealed class KeywordRegistry : IKeywordRegistry
         pages.TryGetValue(mapping.TargetKey, out IContent? page);
         string name = page?.GetCultureName(culturePart) ?? page?.Name ?? string.Empty;
 
-        return new KeywordTarget(keyword, mapping.TargetKey, url!, name, KeywordSource.Manual);
+        return new KeywordTarget(
+            keyword,
+            mapping.TargetKey,
+            url!,
+            name,
+            KeywordSource.Manual,
+            VariesByCulture: page?.ContentType.Variations.VariesByCulture() ?? false);
     }
 
     /// <summary>

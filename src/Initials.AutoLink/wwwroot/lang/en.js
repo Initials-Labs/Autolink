@@ -54,9 +54,14 @@ export default {
 		unresolvedExternalDetail:
 			'The stored address is not an absolute http or https URL, so nothing links. Point it somewhere else, or remove the keyword.',
 
+		// Anchors that appear wherever a page is named: the name opens the backoffice editor, the path opens the site.
+		editInBackoffice: 'Open this page in the backoffice',
+		viewOnSite: 'View this page on the site',
+
 		// Detail: mentions
 		mentionedOn: (count) => (count === 1 ? 'Mentioned on 1 page' : `Mentioned on ${count} pages`),
-		noMentions: 'No published page in this language writes this word, so the link appears nowhere yet.',
+		noMentions: (allLanguages) =>
+			`No published page in ${allLanguages ? 'any' : 'this'} language writes this word, so the link appears nowhere yet.`,
 		linked: 'linked',
 		doNotLinkHere: 'Do not link here',
 		neverLink: 'Never link this keyword',
@@ -69,10 +74,10 @@ export default {
 
 		// Why a mention was not linked. Each reads as a clause after "Not linked:" or after "Another mention on this
 		// page." — so each names its own subject rather than trailing off from the sentence before it.
-		reasonSelf: 'this page is the one the keyword points at.',
-		reasonHandLinked: 'somebody has already linked to that page here.',
-		reasonSkippedElement: 'the words sit inside a heading, or inside a link somebody added.',
-		reasonLimit: 'only the first mention on a page is linked.',
+		reasonSelf: 'This page is the one the keyword points at.',
+		reasonHandLinked: 'Somebody has already linked to that page here.',
+		reasonSkippedElement: 'The words sit inside a heading, or inside a link somebody added.',
+		reasonLimit: 'Only the first mention on a page is linked.',
 
 		// Adding a keyword and changing where one points
 		addKeyword: 'Add keyword',

@@ -60,6 +60,13 @@ public sealed class KeywordRowResponseModel
 
     public string? TargetName { get; init; }
 
+    /// <summary>
+    /// Whether the target document varies by culture, which the screen needs to build its backoffice edit URL —
+    /// the workspace route wants a culture for a variant document and the literal <c>invariant</c> otherwise.
+    /// Null for an external or unresolved keyword.
+    /// </summary>
+    public bool? TargetVariesByCulture { get; init; }
+
     /// <summary>The resolved destination, or null when it will not resolve in this culture.</summary>
     public string? Url { get; init; }
 

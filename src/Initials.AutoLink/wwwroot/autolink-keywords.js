@@ -165,6 +165,22 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 	}
 
 	/**
+	 * Backoffice edit URL for a document. The variant segment is load-bearing: a variant document opens on a
+	 * culture, an invariant one only on the literal `invariant`, and the wrong one renders a blank workspace
+	 * rather than an error. Left relative and without target=_blank on purpose, so a click stays inside the
+	 * running backoffice — the router soft-navigates, which is also the only load that reliably renders.
+	 */
+	#editUrl(key, variesByCulture, culture) {
+		const variant = variesByCulture ? this.#displayCulture(culture || this.#firstLanguage()) : 'invariant';
+		return `/umbraco/section/content/workspace/document/edit/${key}/${variant}`;
+	}
+
+	/** First real language in the overview, for opening a variant document from the all-languages tab. */
+	#firstLanguage() {
+		return (this._overview?.cultures ?? []).map((entry) => entry.culture).find((entry) => entry) ?? '';
+	}
+
+	/**
 	 * A culture code as the registry spells it.
 	 *
 	 * Stored rows carry a lower-cased culture, because it is an index key compared case-insensitively — so the row
@@ -197,12 +213,15 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 		});
 	}
 
-	/** Keyword to the pages whose copy contains it, in the language being viewed. */
+	/** Keyword to the pages whose copy contains it, in the language being viewed — or in every language on the
+	 * all-languages tab, whose keywords apply everywhere. Scan rows always carry a concrete culture, so an exact
+	 * match against the all tab's empty culture would report every keyword as mentioned nowhere. */
 	#mentions() {
 		const mentions = new Map();
+		const allLanguages = !this._culture;
 
 		for (const page of this._report?.pages ?? []) {
-			if (page.culture !== this._culture) continue;
+			if (!allLanguages && page.culture !== this._culture) continue;
 
 			for (const placement of page.placements) {
 				const key = placement.keyword.toLowerCase();
@@ -221,10 +240,13 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 	#byPage(mentions) {
 		const groups = new Map();
 
+		// Keyed by page AND culture: on the all-languages tab the same page appears once per language, each with
+		// its own URL, its own edit link and its own suppression state, so merging them would cross wires.
 		for (const { page, placement } of mentions) {
-			const group = groups.get(page.pageKey) ?? { page, placements: [] };
+			const key = `${page.pageKey}|${page.culture}`;
+			const group = groups.get(key) ?? { page, placements: [] };
 			group.placements.push(placement);
-			groups.set(page.pageKey, group);
+			groups.set(key, group);
 		}
 
 		return [...groups.values()];
@@ -670,8 +692,14 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 							? html`<a href=${row.url} target="_blank" rel="noopener noreferrer">${row.targetName}</a>
 									<span class="path">${row.url}</span>
 									<span class="pill">${this.localize.term('initialsAutoLink_external')} <span aria-hidden="true">&#8599;</span></span>`
-							: html`<a href=${row.url} target="_blank" rel="noopener">${row.targetName}</a>
-									<span class="path">${row.url}</span>`}
+							: html`<a
+										href=${this.#editUrl(row.targetKey, row.targetVariesByCulture, this._culture)}
+										title=${this.localize.term('initialsAutoLink_editInBackoffice')}
+										>${row.targetName}</a
+									>
+									<a class="path" href=${row.url} target="_blank" rel="noopener" title=${this.localize.term('initialsAutoLink_viewOnSite')}
+										>${row.url}</a
+									>`}
 				</span>
 
 				<span class="counts">
@@ -705,14 +733,14 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 				aria-label=${this.localize.term('initialsAutoLink_detailFor', row.keyword)}>
 				${this.#renderDestination(row)}
 				${mentions.length === 0
-					? html`<p class="muted">${this.localize.term('initialsAutoLink_noMentions')}</p>`
+					? html`<p class="muted">${this.localize.term('initialsAutoLink_noMentions', !this._culture)}</p>`
 					: html`<div class="caption">
 								${this.localize.term('initialsAutoLink_mentionedOn', this.#byPage(mentions).length)}
 							</div>
 							<div class="mentions">
 								${repeat(
 									this.#byPage(mentions),
-									(group) => group.page.pageKey,
+									(group) => `${group.page.pageKey}|${group.page.culture}`,
 									(group) => this.#renderPageGroup(row, group),
 								)}
 							</div>
@@ -720,7 +748,7 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 								mentions.some((m) => this.#state(m.placement) === 'linked'),
 								() => html`<div class="detail-actions">
 									<uui-button
-										look="secondary"
+										look="outline"
 										color="danger"
 										label=${this.localize.term('initialsAutoLink_neverLink')}
 										?disabled=${this._busy === `off|${row.keyword}|${EVERYWHERE}`}
@@ -756,12 +784,12 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 						)}
 					</span>
 					<uui-button
-						look="secondary"
+						look="outline"
 						label=${this.localize.term('initialsAutoLink_changeDestination')}
 						?disabled=${busy}
 						@click=${() => this.#openEdit(row)}></uui-button>
 					<uui-button
-						look="secondary"
+						look="outline"
 						color="danger"
 						label=${this.localize.term('initialsAutoLink_removeKeyword')}
 						?disabled=${busy}
@@ -800,13 +828,26 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 
 		return html`
 			<div class="mention ${state}">
-				<a href=${page.url} target="_blank" rel="noopener">${page.name}</a>
-				<span class="path">${page.url}</span>
+				<a
+					href=${this.#editUrl(page.pageKey, page.variesByCulture, page.culture)}
+					title=${this.localize.term('initialsAutoLink_editInBackoffice')}
+					>${page.name}</a
+				>
+				<!-- One grid cell, not two children: .mention maps children to columns by position. -->
+				<span class="place">
+					<a class="path" href=${page.url} target="_blank" rel="noopener" title=${this.localize.term('initialsAutoLink_viewOnSite')}
+						>${page.url}</a
+					>
+					${when(
+						!this._culture && page.culture,
+						() => html`<span class="pill">${this.#displayCulture(page.culture)}</span>`,
+					)}
+				</span>
 
 				${state === 'linked'
 					? html`<span class="good">${this.localize.term('initialsAutoLink_linked')}</span>
 							<uui-button
-								look="secondary"
+								look="outline"
 								label=${this.localize.term('initialsAutoLink_doNotLinkHere')}
 								?disabled=${busy}
 								@click=${() => this.#unlink(row.keyword, page.pageKey, page.name)}></uui-button>`
@@ -815,7 +856,7 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 									${this.localize.term('initialsAutoLink_switchedOff', offEverywhere, offAllLanguages)}
 								</span>
 								<uui-button
-									look="secondary"
+									look="outline"
 									label=${offEverywhere
 										? this.localize.term('initialsAutoLink_allowEverywhere')
 										: this.localize.term('initialsAutoLink_allowHere')}
@@ -967,7 +1008,9 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 		   list, which is what made these hard to follow. Same reasoning as the keyword table above. */
 		.group {
 			border-top: 1px solid var(--uui-color-divider);
-			padding: var(--uui-size-space-2) 0;
+			/* Horizontal padding too: the hover wash paints the full row width, and text sitting flush against
+			   its edge reads as a rendering fault rather than a design. */
+			padding: var(--uui-size-space-2) var(--uui-size-space-4);
 		}
 
 		.group:hover {
@@ -1082,6 +1125,15 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 			gap: var(--uui-size-space-3);
 			align-items: center;
 			flex-wrap: wrap;
+		}
+
+		/* URL and language pill share the mention grid's one path cell, so the pill hugs its text instead of
+		   being stretched across a grid track of its own. */
+		.place {
+			display: flex;
+			align-items: center;
+			gap: var(--uui-size-space-2);
+			min-width: 0;
 		}
 
 		.path {

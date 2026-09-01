@@ -13,13 +13,19 @@ namespace Initials.AutoLink.Models;
 /// Value for the anchor rel attribute, or null to omit it. Only external links carry one: auto-generated outbound
 /// links at scale can read as a link scheme, so they are nofollow unless somebody says otherwise.
 /// </param>
+/// <param name="VariesByCulture">
+/// Whether the target document varies by culture. The backoffice needs it to build a workspace edit URL, whose
+/// variant segment is a culture for a variant document and the literal <c>invariant</c> otherwise — the wrong
+/// segment renders a blank workspace, not an error. Always false for an external link.
+/// </param>
 public sealed record KeywordTarget(
     string Keyword,
     Guid TargetKey,
     string Url,
     string TargetName,
     KeywordSource Source,
-    string? Rel = null)
+    string? Rel = null,
+    bool VariesByCulture = false)
 {
     /// <summary>Points outside the site, so there is no page behind it.</summary>
     public bool IsExternal => Source == KeywordSource.External;

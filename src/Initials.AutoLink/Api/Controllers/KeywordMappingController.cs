@@ -88,6 +88,7 @@ public sealed class KeywordMappingController : AutoLinkControllerBase
             Source = target is null ? "unresolved" : target.Source.ToString().ToLowerInvariant(),
             TargetKey = mapping.IsExternal ? null : mapping.TargetKey,
             TargetName = target?.TargetName,
+            TargetVariesByCulture = mapping.IsExternal ? null : target?.VariesByCulture,
             Url = target?.Url,
             ExternalUrl = mapping.ExternalUrl,
             Label = mapping.Label,
