@@ -62,7 +62,7 @@ public sealed class AutoLinkOptions
     /// leave this alone. Either way it is optional — without it, every page stays scannable.
     /// <para>
     /// Keywords are not installed as a property at all. They live in the package's own table and are edited on the
-    /// Auto-linking screen, so there is nothing to add to a document type and nothing to fill in per page.
+    /// Autolink screen, so there is nothing to add to a document type and nothing to fill in per page.
     /// </para>
     /// <para>
     /// The work runs once, from the package's own <c>Initials.AutoLink.Schema</c> migration plan, rather than at every

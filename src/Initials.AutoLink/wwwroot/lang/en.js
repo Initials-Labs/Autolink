@@ -1,5 +1,5 @@
 /**
- * English, and the source of truth for every string the Auto-linking screen shows.
+ * English, and the source of truth for every string the Autolink screen shows.
  *
  * Registered as the base `en` culture, so it resolves for en-GB, en-US and any other English variant. Core ships its
  * own en.js the same way.
@@ -14,7 +14,7 @@
 export default {
 	initialsAutoLink: {
 		// Section and screen
-		sectionName: 'Auto-linking',
+		sectionName: 'Autolink',
 		dashboardName: 'Keywords',
 		heading: 'Keywords',
 		refresh: 'Refresh',
@@ -101,7 +101,7 @@ export default {
 		noKeywords: (language) =>
 			`No keywords in ${language} yet. Add one, and every page whose copy already writes that word links to it the next time it renders.`,
 		notAuthorised: (status) =>
-			`Not authorised (${status}). Your user group needs access to the Auto-linking section.`,
+			`Not authorised (${status}). Your user group needs access to the Autolink section.`,
 		requestFailed: (status) => `The request failed (${status}).`,
 
 		// Confirmations

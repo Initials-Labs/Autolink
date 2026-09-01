@@ -17,7 +17,7 @@
         <div class="row">
             <div class="col-lg-8 col-md-10 mx-auto">
                 @Html.GetBlockListHtml(Model.ContentRows)
-                @* Temporary harness for verifying auto-linking inside the Markdown editor. Weakly typed on
+                @* Temporary harness for verifying Autolink inside the Markdown editor. Weakly typed on
                    purpose: the property may not exist yet when models regenerate. *@
                 @if (Model.Value("markdownTest") is Umbraco.Cms.Core.Strings.IHtmlEncodedString markdownTest)
                 {

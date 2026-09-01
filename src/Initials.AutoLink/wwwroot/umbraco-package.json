@@ -34,11 +34,11 @@
     {
       "type": "section",
       "alias": "Initials.AutoLink.Section",
-      "name": "Auto-linking section",
+      "name": "Autolink section",
       "weight": 40,
       "meta": {
         "label": "#initialsAutoLink_sectionName",
-        "pathname": "auto-linking"
+        "pathname": "Autolink"
       }
     },
     {

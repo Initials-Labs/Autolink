@@ -12,7 +12,7 @@ namespace Initials.AutoLink.Install;
 /// </summary>
 /// <remarks>
 /// This is the one place the package deletes somebody's data, and it is deliberate. Keywords moved into the
-/// package's own table and are edited on the Auto-linking screen; the property left behind on every target
+/// package's own table and are edited on the Autolink screen; the property left behind on every target
 /// document type reads exactly like the one that used to work, so an editor filling it in gets no links and no
 /// explanation. A field that silently does nothing is worse than no field.
 /// <para>
@@ -119,7 +119,7 @@ internal sealed class RemoveLegacyKeywordProperty : AsyncMigrationBase
         await _dataTypeService.DeleteAsync(dataType.Key, Constants.Security.SuperUserKey);
 
         Logger.LogWarning(
-            "Removed the legacy '{Alias}' property from {Count} document type(s) ({Types}) and deleted the {Name} datatype. Keywords now live on the Auto-linking screen; the tag values stored against that property are gone.",
+            "Removed the legacy '{Alias}' property from {Count} document type(s) ({Types}) and deleted the {Name} datatype. Keywords now live on the Autolink screen; the tag values stored against that property are gone.",
             LegacyPropertyAlias,
             cleared.Count,
             cleared.Count == 0 ? "none" : string.Join(", ", cleared),

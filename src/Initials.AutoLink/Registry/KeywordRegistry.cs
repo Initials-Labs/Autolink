@@ -215,7 +215,7 @@ internal sealed class KeywordRegistry : IKeywordRegistry
     /// </summary>
     /// <remarks>
     /// A row that resolves to nothing drops the keyword from this culture's set rather than failing the build, and
-    /// the Auto-linking screen reports it as unresolved. That report is the only way anybody would find out that a
+    /// the Autolink screen reports it as unresolved. That report is the only way anybody would find out that a
     /// page a keyword points at has been deleted, unpublished, or never published in this language — there is no
     /// second source to quietly fall back to any more.
     /// </remarks>

@@ -27,7 +27,7 @@ internal sealed class AutoLinkRelationHandler :
     INotificationHandler<ContentDeletingNotification>,
     INotificationHandler<ContentDeletedNotification>
 {
-    private const string MessageCategory = "Auto-linking";
+    private const string MessageCategory = "Autolink";
 
     private readonly IKeywordMappingStore _mappings;
     private readonly IAutoLinkRelationWriter _relations;
@@ -154,6 +154,6 @@ internal sealed class AutoLinkRelationHandler :
             : "The keyword will be left pointing at nothing while the page is in the recycle bin";
 
         return $"{name} is where the auto-link {what} {list} point. {consequence} "
-               + $"{fate}, and the Auto-linking screen will flag it so you can send it somewhere else.";
+               + $"{fate}, and the Autolink screen will flag it so you can send it somewhere else.";
     }
 }

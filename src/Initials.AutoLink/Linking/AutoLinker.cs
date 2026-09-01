@@ -125,7 +125,7 @@ internal sealed class AutoLinker : IAutoLinker
         catch (Exception ex)
         {
             // Never let a markup edge case take down a page render.
-            _logger.LogError(ex, "Auto-linking failed for a rich text property. Returning the original markup.");
+            _logger.LogError(ex, "Autolink failed for a rich text property. Returning the original markup.");
             return markup;
         }
     }

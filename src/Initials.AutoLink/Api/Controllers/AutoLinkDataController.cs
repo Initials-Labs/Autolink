@@ -19,7 +19,7 @@ namespace Initials.AutoLink.Api.Controllers;
 /// now the only place keywords exist, so this drops the lot.
 /// </para>
 /// <para>
-/// It also asks for more than the section: everything else here is gated on access to the Auto-linking section, which
+/// It also asks for more than the section: everything else here is gated on access to the Autolink section, which
 /// is the permission an editor settling keyword collisions holds. Dropping both tables is not that permission, so this
 /// one endpoint additionally requires an administrator. Both policies apply, so the administrator doing the teardown
 /// needs the section granted as well — the same tick that let them use the dashboard in the first place. The

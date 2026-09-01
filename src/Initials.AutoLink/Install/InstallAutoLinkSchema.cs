@@ -15,7 +15,7 @@ namespace Initials.AutoLink.Install;
 /// <remarks>
 /// One property, and an optional one. Keywords used to be installed alongside it as a Tags property on every target
 /// document type, which is what made this class worth having; they now live in the package's own table and are
-/// edited on the Auto-linking screen, so the only thing left that genuinely belongs on a page is whether that page's
+/// edited on the Autolink screen, so the only thing left that genuinely belongs on a page is whether that page's
 /// rich text gets scanned.
 /// <para>
 /// A migration rather than a startup handler. The work is a one-off bootstrap, and doing it on every boot meant a
@@ -40,7 +40,7 @@ namespace Initials.AutoLink.Install;
 internal sealed class InstallAutoLinkSchema : AsyncMigrationBase
 {
     private const string PropertyGroupAlias = "autoLinking";
-    private const string PropertyGroupName = "Auto-linking";
+    private const string PropertyGroupName = "Autolink";
 
     private readonly IDataTypeService _dataTypeService;
     private readonly IContentTypeService _contentTypeService;
@@ -121,7 +121,7 @@ internal sealed class InstallAutoLinkSchema : AsyncMigrationBase
         var exclude = new PropertyType(_shortStringHelper, booleanDataType)
         {
             Alias = _options.ExcludePropertyAlias,
-            Name = "Exclude from auto-linking",
+            Name = "Exclude from Autolink",
             Description = "Stop this page's rich text being scanned. It can still be a link target.",
             SortOrder = 10,
         };

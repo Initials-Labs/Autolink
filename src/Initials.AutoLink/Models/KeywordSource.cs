@@ -6,7 +6,7 @@ namespace Initials.AutoLink.Models;
 /// </summary>
 public enum KeywordSource
 {
-    /// <summary>A page in this site, chosen on the Auto-linking screen.</summary>
+    /// <summary>A page in this site, chosen on the Autolink screen.</summary>
     Manual,
 
     /// <summary>Somewhere outside the site. No page behind it.</summary>

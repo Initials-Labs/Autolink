@@ -24,15 +24,15 @@ has not been built against, rather than the site failing at runtime.
 
 Then three things, in order:
 
-1. **Grant the section.** Users → User Groups → your group → Sections → **Auto-linking**. A new section is granted
+1. **Grant the section.** Users → User Groups → your group → Sections → **Autolink**. A new section is granted
    to nobody by default, administrators included, so until you do this the screen is not reachable and the package
    looks like it did not install.
-2. **Add a keyword.** Auto-linking → Keywords → add the phrase, and pick where it goes with the Multi URL Picker —
+2. **Add a keyword.** Autolink → Keywords → add the phrase, and pick where it goes with the Multi URL Picker —
    a page, or an address outside the site.
 3. **Reload a page that mentions it.** That is the whole setup. Nothing is added to your document types, there is
    nothing for an editor to fill in per page, and no page needs republishing.
 
-## The Auto-linking section
+## The Autolink section
 
 One screen, Keywords, showing both halves of every keyword: where it points, and which published pages currently
 carry a link because of it. It is where you add keywords, change where one goes, and switch individual links off —
