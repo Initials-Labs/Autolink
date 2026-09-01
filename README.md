@@ -60,6 +60,9 @@ Issues and pull requests are welcome, at [Initials-Labs/Autolink](https://github
   `[FEAT]` / `[BUG]` and the like.
 - `dotnet build Autolink.slnx` must come out clean — the package treats warnings as errors — and
   `dotnet test tests/Initials.AutoLink.Tests/Initials.AutoLink.Tests.csproj` must pass.
+- Bump the version with `./tools/bump-version.ps1 <version>`, never by hand: the number lives in the csproj, the
+  package manifest and its asset cache-busters, and the build fails if they drift. Releasing is then tagging the
+  same number.
 - Anything touching the composer, the migrations or the value converters should also be checked on the running
   site in `Autolink/`. Umbraco discovers those by reflection and DI, so getting them wrong compiles fine and
   fails silently — `docs/build-log.md` records what to look for.
