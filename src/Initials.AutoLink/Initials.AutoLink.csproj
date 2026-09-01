@@ -21,7 +21,7 @@
 
   <PropertyGroup Label="Package">
     <PackageId>Initials.AutoLink</PackageId>
-    <Version>0.1.0-alpha002</Version>
+    <Version>0.1.0-alpha003</Version>
     <Authors>Owain Williams</Authors>
     <Company>Owain Williams</Company>
     <Title>Initials.AutoLink for Umbraco</Title>
