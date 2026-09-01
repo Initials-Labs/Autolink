@@ -1,11 +1,12 @@
 name: release
 
 # Publishing is a tag push, nothing else. A tag is deliberate in a way a branch push is not, and it leaves the
-# release commit pointed at from the repo history. Tag v0.1.0 to ship 0.1.0.
+# release commit pointed at from the repo history. Tag 0.1.0 (or v0.1.0 — both spellings work) to ship 0.1.0.
 on:
   push:
     tags:
-      - 'v*'
+      - '[0-9]*'
+      - 'v[0-9]*'
 
 # id-token lets the job mint a GitHub OIDC token, which nuget.org's trusted publishing policy exchanges for a
 # short-lived push key. No long-lived secret exists to leak or expire.
