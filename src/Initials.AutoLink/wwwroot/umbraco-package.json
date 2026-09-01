@@ -1,7 +1,7 @@
 {
   "$schema": "../../umbraco-package-schema.json",
   "name": "Initials.AutoLink",
-  "version": "0.1.0-alpha002",
+  "version": "0.1.0-alpha003",
   "allowTelemetry": true,
   "extensions": [
     {
