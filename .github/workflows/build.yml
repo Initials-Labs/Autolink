@@ -1,8 +1,6 @@
 name: build
 
 on:
-  # Every branch, not just main: a feature branch that only gets validated once a pull request exists is a feature
-  # branch nobody is checking.
   push:
     branches: ['**']
   pull_request:
@@ -15,9 +13,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # One version number lives in five places: the csproj, the manifest, and a cache-buster on each of the
-      # three asset paths. They drift the first release somebody bumps four of them, and a stale ?v= serves a
-      # consumer last version's dashboard out of their browser cache. Cheaper to check than to notice.
       - name: Check the version numbers agree
         run: |
           csproj=$(grep -oPm1 '(?<=<Version>)[^<]+' src/Initials.AutoLink/Initials.AutoLink.csproj)
@@ -28,10 +23,6 @@ jobs:
             [ "$v" = "$csproj" ] || { echo "an asset path is cache-busted with ?v=$v"; exit 1; }
           done
 
-      # The Marketplace reads this from the default branch root, so a typo here is only visible on the listing.
-      # Validated against the real schema, not just parsed: a misspelt Category is well-formed JSON that the
-      # Marketplace quietly ignores. regex-variant python because Umbraco's schema contains a \: escape that
-      # is illegal in strict ECMA regexes, so the default engine rejects the schema itself.
       - name: Check the Marketplace listing file against the schema
         run: pipx run check-jsonschema --regex-variant python --schemafile https://marketplace.umbraco.com/umbraco-marketplace-schema.json umbraco-marketplace.json
 
@@ -42,7 +33,6 @@ jobs:
       - name: Restore
         run: dotnet restore Autolink.slnx
 
-      # The package treats warnings as errors, so this fails on a new warning rather than letting one ship.
       - name: Build
         run: dotnet build Autolink.slnx --no-restore -c Release
 
@@ -52,7 +42,6 @@ jobs:
       - name: Pack
         run: dotnet pack src/Initials.AutoLink/Initials.AutoLink.csproj --no-build -c Release -o artifacts
 
-      # Guards the two things that silently break a package: the dashboard not shipping, and a stray dependency.
       - name: Check the package contents
         run: |
           unzip -l artifacts/*.nupkg
