@@ -6,12 +6,6 @@ namespace Initials.AutoLink.Caching;
 /// <summary>
 /// Carries "the keyword decisions changed" to every server.
 /// </summary>
-/// <remarks>
-/// Content changes reach other nodes through Umbraco's own cache refreshers, but the mapping and suppression tables
-/// are ours: a decision saved through the API invalidated only the node that served the request, so on a load
-/// balanced site or Umbraco Cloud the other nodes carried on serving the old links indefinitely. Going through the
-/// distributed cache makes the invalidation land everywhere.
-/// </remarks>
 internal sealed class AutoLinkCacheRefresher : ICacheRefresher
 {
     /// <summary>Stable identity for this refresher. Must not change once deployed.</summary>

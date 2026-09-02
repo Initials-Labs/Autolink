@@ -6,11 +6,6 @@ namespace Initials.AutoLink.Persistence;
 /// <summary>
 /// A keyword and its destination. There is no other source of keywords.
 /// </summary>
-/// <remarks>
-/// The keyword is stored twice on purpose. <c>keywordKey</c> is lower-cased and carries the unique index, so
-/// uniqueness behaves the same on SQLite (case-sensitive text by default) as on SQL Server (usually not).
-/// <c>keyword</c> keeps the casing somebody typed, purely so the backoffice can show it back to them.
-/// </remarks>
 [TableName(TableName)]
 [PrimaryKey("id", AutoIncrement = true)]
 [ExplicitColumns]

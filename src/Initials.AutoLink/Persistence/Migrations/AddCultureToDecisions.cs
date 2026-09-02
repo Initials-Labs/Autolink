@@ -8,13 +8,6 @@ namespace Initials.AutoLink.Persistence.Migrations;
 /// <summary>
 /// Adds the culture column to both decision tables, preserving the rows already in them.
 /// </summary>
-/// <remarks>
-/// Rebuilt rather than altered. Umbraco's migration layer refuses <c>ALTER TABLE</c> outright on SQLite — the
-/// exception says so in as many words — so the portable route is to read the rows out, drop the table, create it
-/// from the current DTO (which brings the new column and the new unique index with it), and put the rows back.
-/// Existing rows get an empty culture, meaning "every culture", which is exactly what they meant when the site had
-/// only one.
-/// </remarks>
 internal sealed class AddCultureToDecisions : AsyncMigrationBase
 {
     public AddCultureToDecisions(IMigrationContext context) : base(context)

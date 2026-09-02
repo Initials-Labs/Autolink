@@ -4,15 +4,11 @@ import { UMB_AUTH_CONTEXT } from '@umbraco-cms/backoffice/auth';
 import { UMB_NOTIFICATION_CONTEXT } from '@umbraco-cms/backoffice/notification';
 import '@umbraco-cms/backoffice/external/uui';
 
-// Umbraco's own Multi URL Picker input, the one behind the Umbraco.MultiUrlPicker property editor. Importing it
-// defines <umb-input-multi-url>, and with it the link picker modal that already knows how to offer a page or a
-// typed URL. Rebuilding either of those here would mean a picker that behaves almost like the one editors know.
 import '@umbraco-cms/backoffice/multi-url-picker';
 
 const API = '/umbraco/management/api/v1/autolink';
 const EVERYWHERE = '00000000-0000-0000-0000-000000000000';
 
-/** Skip codes from the server to localisation keys. The wording lives in lang/en.js. */
 const REASON_KEYS = {
 	self: 'initialsAutoLink_reasonSelf',
 	'hand-linked': 'initialsAutoLink_reasonHandLinked',
@@ -20,17 +16,6 @@ const REASON_KEYS = {
 	limit: 'initialsAutoLink_reasonLimit',
 };
 
-/**
- * One row per keyword, detail on demand.
- *
- * This screen owns the keywords outright. There is no property on any document type to fill in and no tag to
- * apply: a keyword exists because somebody added it here, and it points wherever they pointed it. Which is why
- * the destination is Umbraco's Multi URL Picker rather than a URL box — a page and an outside URL are the same
- * decision, and the picker is where an editor already expects to make it.
- *
- * Rows are summaries, aligned in columns so they can be scanned down, with detail underneath. Rows needing
- * attention sort first and open themselves, because they are the only ones anybody has to act on.
- */
 export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 	static properties = {
 		_overview: { state: true },
@@ -77,10 +62,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 		this.#load();
 	}
 
-	/**
-	 * Plain fetch rather than umbHttpClient: that client routes failures through backoffice error handling, where a
-	 * 401 from a package endpoint is indistinguishable from an expired session and signs the user out.
-	 */
 	async #request(method, path, body) {
 		const token = await this.#auth?.getLatestToken();
 
@@ -105,8 +86,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 			};
 		}
 
-		// A rejected save says why in the body. Worth showing: every validation rule on the way in is a sentence
-		// somebody needs to read, and "the request failed (400)" is not that sentence.
 		if (response.status === 400) {
 			const reason = await response.text().catch(() => '');
 			if (reason) {
@@ -121,8 +100,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 		this._loading = true;
 		this._error = null;
 
-		// The keyword list and the scan answer the two halves. Both are cheap, so the screen always has both rather
-		// than making the mentions something you go and ask for.
 		const [keywords, scan] = await Promise.all([
 			this.#request('GET', '/keywords'),
 			this.#request('GET', '/scan'),
@@ -144,7 +121,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 			this._culture = interesting?.culture ?? '';
 		}
 
-		// Anything broken opens itself; there is nothing to think about on the rest.
 		const expanded = new Set(this._expanded);
 		for (const row of this.#rows()) {
 			if (row.source === 'unresolved') expanded.add(row.keyword);
@@ -164,29 +140,15 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 			: this.#displayCulture(culture);
 	}
 
-	/**
-	 * Backoffice edit URL for a document. The variant segment is load-bearing: a variant document opens on a
-	 * culture, an invariant one only on the literal `invariant`, and the wrong one renders a blank workspace
-	 * rather than an error. Left relative and without target=_blank on purpose, so a click stays inside the
-	 * running backoffice — the router soft-navigates, which is also the only load that reliably renders.
-	 */
 	#editUrl(key, variesByCulture, culture) {
 		const variant = variesByCulture ? this.#displayCulture(culture || this.#firstLanguage()) : 'invariant';
 		return `/umbraco/section/content/workspace/document/edit/${key}/${variant}`;
 	}
 
-	/** First real language in the overview, for opening a variant document from the all-languages tab. */
 	#firstLanguage() {
 		return (this._overview?.cultures ?? []).map((entry) => entry.culture).find((entry) => entry) ?? '';
 	}
 
-	/**
-	 * A culture code as the registry spells it.
-	 *
-	 * Stored rows carry a lower-cased culture, because it is an index key compared case-insensitively — so the row
-	 * for en-GB comes back from the API as "en-gb". Showing that verbatim in a sentence reads as a bug. The
-	 * registry's own list is the display spelling.
-	 */
 	#displayCulture(culture) {
 		const known = (this._overview?.cultures ?? []).find(
 			(entry) => entry.culture.toLowerCase() === culture.toLowerCase(),
@@ -195,7 +157,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 		return known?.culture ?? culture;
 	}
 
-	/** Keyword rows for the language being viewed, the ones needing attention first. */
 	#rows() {
 		const rows = [...(this.#selected()?.keywords ?? [])];
 		const mentions = this.#mentions();
@@ -213,9 +174,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 		});
 	}
 
-	/** Keyword to the pages whose copy contains it, in the language being viewed — or in every language on the
-	 * all-languages tab, whose keywords apply everywhere. Scan rows always carry a concrete culture, so an exact
-	 * match against the all tab's empty culture would report every keyword as mentioned nowhere. */
 	#mentions() {
 		const mentions = new Map();
 		const allLanguages = !this._culture;
@@ -232,16 +190,9 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 		return mentions;
 	}
 
-	/**
-	 * Mentions grouped by page. A page can mention a keyword several times and get a different answer each time —
-	 * linked once, then capped, then one sitting in a heading — which as sibling rows read like three unrelated
-	 * findings about the same page.
-	 */
 	#byPage(mentions) {
 		const groups = new Map();
 
-		// Keyed by page AND culture: on the all-languages tab the same page appears once per language, each with
-		// its own URL, its own edit link and its own suppression state, so merging them would cross wires.
 		for (const { page, placement } of mentions) {
 			const key = `${page.pageKey}|${page.culture}`;
 			const group = groups.get(key) ?? { page, placements: [] };
@@ -252,7 +203,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 		return [...groups.values()];
 	}
 
-	/** What the page line should say: linked if anything linked, else switched off, else the first reason. */
 	#primary(placements) {
 		return (
 			placements.find((p) => this.#state(p) === 'linked') ??
@@ -261,12 +211,10 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 		);
 	}
 
-	/** A DOM-safe id for a keyword, so aria-controls can reference its detail panel. */
 	#panelId(keyword) {
 		return `autolink-detail-${keyword.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 	}
 
-	/** The localised clause explaining why a mention was not linked. */
 	#reason(placement) {
 		const key = REASON_KEYS[placement.skipReason];
 
@@ -298,10 +246,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 		await this.#load();
 		return true;
 	}
-
-	// ---------------------------------------------------------------------------------------------------------
-	// The form: one shape for adding a keyword and for changing where an existing one points.
-	// ---------------------------------------------------------------------------------------------------------
 
 	#resetForm() {
 		this._adding = false;
@@ -335,14 +279,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 				: null;
 	}
 
-	/**
-	 * What the picker handed back, if this package can store it.
-	 *
-	 * A media pick is turned away rather than quietly stored. Media resolves to a site-relative URL, and the
-	 * validation on an external destination insists on an absolute http or https one on purpose — it is the only
-	 * editor-typed string that reaches an href. Loosening it for a keyword pointing at a PDF is not a trade worth
-	 * making here.
-	 */
 	#onLinkChange(event) {
 		const link = event.target.urls?.[0] ?? null;
 
@@ -356,8 +292,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 
 		this._formLink = link;
 
-		// Nothing in an auto-link opens a new window, and the picker's checkbox cannot be hidden. Say so rather
-		// than dropping it silently.
 		this._formTargetNoticed = Boolean(link?.target);
 	}
 
@@ -381,8 +315,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 			const url = (link.url ?? '').trim();
 			const lower = url.toLowerCase();
 
-			// Checked here as well as at the API, so a typo comes back as a sentence about the URL instead of a
-			// rejected request.
 			if (!lower.startsWith('http://') && !lower.startsWith('https://')) {
 				this.#notify('danger', this.localize.term('initialsAutoLink_notAbsoluteUrl'));
 				return;
@@ -446,9 +378,7 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 	#notify(colour, message) {
 		try {
 			this.#notifications?.peek(colour, { data: { message } });
-		} catch {
-			// A missing notification context is not worth failing an action over.
-		}
+		} catch {}
 	}
 
 	render() {
@@ -658,7 +588,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 		const open = this._expanded.has(row.keyword);
 		const broken = row.source === 'unresolved';
 
-		// Counted per page, not per mention, so these agree with the list that opens underneath.
 		const pages = this.#byPage(mentions).map((group) => this.#state(this.#primary(group.placements)));
 		const counts = {
 			linked: pages.filter((state) => state === 'linked').length,
@@ -666,7 +595,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 			skipped: pages.filter((state) => state === 'skipped').length,
 		};
 
-		// Derived once and passed down: the button's aria-controls and the panel's id have to be the same string.
 		const panelId = this.#panelId(row.keyword);
 
 		return html`
@@ -759,7 +687,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 		`;
 	}
 
-	/** Where this keyword goes, and the two things you can do about it. */
 	#renderDestination(row) {
 		const busy = this._busy === `remove|${row.keyword}` || this._busy?.startsWith(`save|${row.keyword}`);
 		const broken = row.source === 'unresolved';
@@ -833,7 +760,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 					title=${this.localize.term('initialsAutoLink_editInBackoffice')}
 					>${page.name}</a
 				>
-				<!-- One grid cell, not two children: .mention maps children to columns by position. -->
 				<span class="place">
 					<a class="path" href=${page.url} target="_blank" rel="noopener" title=${this.localize.term('initialsAutoLink_viewOnSite')}
 						>${page.url}</a
@@ -891,10 +817,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 			flex-direction: column;
 		}
 
-		/* Head and rows share one explicit template, which is what lines the columns up. Deliberately not subgrid:
-		   fixed tracks align in every browser and this needs no cleverness.
-		   Proportional tracks rather than fixed ones, because a fixed destination column plus 1fr stranded the
-		   mentions count on its own at the far right of a wide screen. */
 		.head,
 		.row {
 			display: grid;
@@ -914,8 +836,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 			padding-bottom: var(--uui-size-space-2);
 		}
 
-		/* The count column reads as a right-hand metric, the way a total does in any table. Left-aligned it just
-		   floats in the middle of nowhere. */
 		.head span:last-of-type,
 		.counts {
 			justify-content: flex-end;
@@ -926,8 +846,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 			box-shadow: inset 3px 0 0 0 var(--uui-color-danger);
 		}
 
-		/* An open keyword is a block, not just a tinted line: a wash to group it, a heavier rule to close it off from
-		   the next keyword, and room at the bottom so the detail does not run into it. */
 		.row.open {
 			background: color-mix(in srgb, var(--uui-color-interactive, #3544b1) 4%, transparent);
 			border-bottom: 2px solid var(--uui-color-divider);
@@ -961,7 +879,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 			display: flex;
 			flex-wrap: wrap;
 			gap: var(--uui-size-space-2);
-			/* Centred, not baseline: the external pill has its own box and sits low against a text baseline. */
 			align-items: center;
 		}
 
@@ -969,15 +886,11 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 			font-weight: 600;
 		}
 
-		/* Detail spans every column, and hangs off a vertical rule under the keyword so it plainly belongs to the row
-		   above rather than floating between two of them. */
 		.detail {
 			grid-column: 1 / -1;
 			display: flex;
 			flex-direction: column;
 			gap: var(--uui-size-space-3);
-			/* 2rem is the caret track, so the rule sits under the caret and the detail's text starts on the same
-			   line as the keyword above it. It used to hang slightly left of the keyword, which read as a mistake. */
 			margin: var(--uui-size-space-4) 0 0 2rem;
 			padding: 0 0 0 var(--uui-size-space-4);
 			border-left: 2px solid color-mix(in srgb, var(--uui-color-interactive, #3544b1) 25%, transparent);
@@ -1004,12 +917,8 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 			margin-bottom: 0;
 		}
 
-		/* Fixed tracks, not max-content: every mention row must use the same columns or nothing lines up down the
-		   list, which is what made these hard to follow. Same reasoning as the keyword table above. */
 		.group {
 			border-top: 1px solid var(--uui-color-divider);
-			/* Horizontal padding too: the hover wash paints the full row width, and text sitting flush against
-			   its edge reads as a rendering fault rather than a design. */
 			padding: var(--uui-size-space-2) var(--uui-size-space-4);
 		}
 
@@ -1017,8 +926,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 			background: color-mix(in srgb, var(--uui-color-interactive, #3544b1) 10%, transparent);
 		}
 
-		/* Same reasoning as the keyword table: proportional tracks, and the action pinned right so the buttons form
-		   one column down the list instead of drifting with the length of each URL. */
 		.mention {
 			display: grid;
 			grid-template-columns: minmax(9rem, 1.5fr) minmax(8rem, 2fr) minmax(6rem, 1fr) 10rem;
@@ -1031,13 +938,11 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 			justify-self: end;
 		}
 
-		/* A skip reason is a sentence, not a status word, so it gets the status and action columns to wrap in. */
 		.mention.skipped > .muted {
 			grid-column: 3 / -1;
 			text-align: right;
 		}
 
-		/* Indented under the page it belongs to, and quiet: these are footnotes about one page, not findings. */
 		.note {
 			padding-left: var(--uui-size-space-4);
 			color: var(--uui-color-text-alt);
@@ -1050,7 +955,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 			flex-direction: column;
 		}
 
-		/* A heavier rule under the keyword row, so the detail reads as belonging to it rather than floating. */
 		.detail .mentions {
 			border-top: 1px solid var(--uui-color-divider);
 		}
@@ -1085,9 +989,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 			align-items: start;
 		}
 
-		/* Every field is a label stacked over its control. The picker is a stack of its own — a ref-node once
-		   something is chosen, a full-width placeholder button before that — and it only lines up with the keyword
-		   box if that one carries a label of the same height rather than relying on its placeholder. */
 		.field {
 			display: flex;
 			flex-direction: column;
@@ -1104,7 +1005,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 			font-weight: 600;
 		}
 
-		/* Left, with the fields, rather than stretched across the form by the parent's flex stretch. */
 		.detail-actions,
 		.form > div:last-child {
 			display: flex;
@@ -1127,8 +1027,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 			flex-wrap: wrap;
 		}
 
-		/* URL and language pill share the mention grid's one path cell, so the pill hugs its text instead of
-		   being stretched across a grid track of its own. */
 		.place {
 			display: flex;
 			align-items: center;
@@ -1147,8 +1045,6 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 			font-size: var(--uui-type-small-size);
 		}
 
-		/* A pill rather than more grey text: leaving the site is a different kind of destination, not a note about
-		   provenance, so it earns the one badge on the row. The arrow says outbound without needing an icon set. */
 		.pill {
 			display: inline-flex;
 			align-items: center;

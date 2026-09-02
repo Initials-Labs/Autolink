@@ -81,9 +81,6 @@ internal sealed class KeywordSuppressionStore : IKeywordSuppressionStore
         }
         catch (Exception ex)
         {
-            // Same reasoning as the mapping store: a missing table degrades to linking everything rather than
-            // taking the registry down. The failure mode is a link that should have been suppressed, which is
-            // visible and fixable, rather than a site with no links at all.
             _logger.LogError(ex, "Could not read auto-link suppressions. Nothing will be suppressed.");
             return [];
         }
@@ -102,9 +99,6 @@ internal sealed class KeywordSuppressionStore : IKeywordSuppressionStore
 
         if (Insert(DecisionKey.Normalise(trimmed), trimmed, pageKey, culture, createdBy))
         {
-            // Invalidated here rather than by the caller, for the same reason as the mapping store: this is the
-            // code that knows a row appeared, and an invalidation nobody sends leaves the other servers linking
-            // a keyword this page just switched off.
             _invalidator.InvalidateEverywhere();
         }
     }
@@ -120,7 +114,6 @@ internal sealed class KeywordSuppressionStore : IKeywordSuppressionStore
 
         if (scope.Database.FirstOrDefault<KeywordSuppressionDto>(existing) is not null)
         {
-            // Suppressing twice is not an error, it is the same decision.
             return false;
         }
 

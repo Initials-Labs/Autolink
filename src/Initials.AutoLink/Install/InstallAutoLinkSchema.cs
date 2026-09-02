@@ -12,31 +12,6 @@ namespace Initials.AutoLink.Install;
 /// <summary>
 /// Adds the scan opt-out property to the nominated document types.
 /// </summary>
-/// <remarks>
-/// One property, and an optional one. Keywords used to be installed alongside it as a Tags property on every target
-/// document type, which is what made this class worth having; they now live in the package's own table and are
-/// edited on the Autolink screen, so the only thing left that genuinely belongs on a page is whether that page's
-/// rich text gets scanned.
-/// <para>
-/// A migration rather than a startup handler. The work is a one-off bootstrap, and doing it on every boot meant a
-/// package editing document types every time the site started, which is nobody's expectation — and on a site using
-/// <c>InMemoryAuto</c> models it regenerated the models under already-compiled views, so the first page load after
-/// an install failed.
-/// </para>
-/// <para>
-/// Everything here stays additive and idempotent even though it now runs once: an existing property is left alone,
-/// and the property group is only added when it is absent. Nothing is renamed, moved or deleted, so running this
-/// against a site somebody has since customised cannot undo their work.
-/// </para>
-/// <para>
-/// A nominated document type that does not exist is the one case that is not simply skipped: this throws, which
-/// leaves the plan state where it was so the next boot tries again. An unattended install imports its starter kit
-/// around the same runtime this hooks, so the document types can genuinely arrive after the first attempt, and a
-/// one-shot that quietly gave up on them would leave a site that looks installed and scans nothing it was told to
-/// leave alone. A wrong alias in configuration lands in the same place, which is the honest outcome: it is a
-/// misconfiguration, and it says so once per boot until somebody fixes it.
-/// </para>
-/// </remarks>
 internal sealed class InstallAutoLinkSchema : AsyncMigrationBase
 {
     private const string PropertyGroupAlias = "autoLinking";
@@ -65,8 +40,6 @@ internal sealed class InstallAutoLinkSchema : AsyncMigrationBase
     {
         if (_options.InstallOnDocumentTypes.Length == 0)
         {
-            // The handler does not execute this plan in that state. This is the belt to its braces: a migration that
-            // added a property nobody asked for, because it was reached by some other route, would be worse.
             Logger.LogDebug("No document types are nominated for the auto-link schema, so there is nothing to install.");
             return;
         }

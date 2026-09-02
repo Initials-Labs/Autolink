@@ -1,19 +1,5 @@
-/**
- * English, and the source of truth for every string the Autolink screen shows.
- *
- * Registered as the base `en` culture, so it resolves for en-GB, en-US and any other English variant. Core ships its
- * own en.js the same way.
- *
- * Terms are referenced as initialsAutoLink_alias. A term that needs values is a **function** taking them as arguments,
- * which is how v14 onwards does it — the older %0% token style renders literally. Functions are also why
- * pluralisation lives here rather than being assembled from fragments in the element.
- *
- * To add a language: copy this file, translate the values, and register it in umbraco-package.json with its own
- * culture.
- */
 export default {
 	initialsAutoLink: {
-		// Section and screen
 		sectionName: 'Autolink',
 		dashboardName: 'Keywords',
 		heading: 'Keywords',
@@ -22,18 +8,15 @@ export default {
 		allLanguages: 'All languages',
 		languageGroup: 'Language',
 
-		// Summary line
 		keywordCount: (count) => (count === 1 ? '1 keyword' : `${count} keywords`),
 		needingAttention: (count) => (count === 1 ? '1 needs attention' : `${count} need attention`),
 		linkingOnPages: (count) => (count === 1 ? 'linking on 1 page' : `linking on ${count} pages`),
 		pagesChecked: (count) => `${count} pages checked, nothing stored`,
 
-		// Columns
 		columnKeyword: 'Keyword',
 		columnLinksTo: 'Links to',
 		columnMentions: 'Mentions',
 
-		// Row summary
 		showDetail: (keyword) => `Show detail for ${keyword}`,
 		hideDetail: (keyword) => `Hide detail for ${keyword}`,
 		detailFor: (keyword) => `Detail for ${keyword}`,
@@ -44,7 +27,6 @@ export default {
 		countNotLinked: (count) => `${count} not linked`,
 		countNone: 'none',
 
-		// Detail: the destination
 		setFor: (language, who) => `Set for ${language} by ${who}.`,
 		somebody: 'somebody',
 		changeDestination: 'Change destination',
@@ -54,11 +36,9 @@ export default {
 		unresolvedExternalDetail:
 			'The stored address is not an absolute http or https URL, so nothing links. Point it somewhere else, or remove the keyword.',
 
-		// Anchors that appear wherever a page is named: the name opens the backoffice editor, the path opens the site.
 		editInBackoffice: 'Open this page in the backoffice',
 		viewOnSite: 'View this page on the site',
 
-		// Detail: mentions
 		mentionedOn: (count) => (count === 1 ? 'Mentioned on 1 page' : `Mentioned on ${count} pages`),
 		noMentions: (allLanguages) =>
 			`No published page in ${allLanguages ? 'any' : 'this'} language writes this word, so the link appears nowhere yet.`,
@@ -72,14 +52,11 @@ export default {
 		anotherMention: (reason) => `Another mention on this page. ${reason}`,
 		notLinked: (reason) => `Not linked: ${reason}`,
 
-		// Why a mention was not linked. Each reads as a clause after "Not linked:" or after "Another mention on this
-		// page." — so each names its own subject rather than trailing off from the sentence before it.
 		reasonSelf: 'This page is the one the keyword points at.',
 		reasonHandLinked: 'Somebody has already linked to that page here.',
 		reasonSkippedElement: 'The words sit inside a heading, or inside a link somebody added.',
 		reasonLimit: 'Only the first mention on a page is linked.',
 
-		// Adding a keyword and changing where one points
 		addKeyword: 'Add keyword',
 		cancel: 'Cancel',
 		addHeading: (language) => `Add a keyword for ${language}`,
@@ -97,14 +74,12 @@ export default {
 		mediaNotSupported: 'A keyword can link to a page or to an address outside the site. Media is not supported.',
 		targetNotUsed: 'Auto-links never open a new window, so that choice will not be used.',
 
-		// Empty and error states
 		noKeywords: (language) =>
 			`No keywords in ${language} yet. Add one, and every page whose copy already writes that word links to it the next time it renders.`,
 		notAuthorised: (status) =>
 			`Not authorised (${status}). Your user group needs access to the Autolink section.`,
 		requestFailed: (status) => `The request failed (${status}).`,
 
-		// Confirmations
 		nowLinksTo: (keyword, target) => `“${keyword}” now links to ${target}.`,
 		keywordRemoved: (keyword) => `“${keyword}” has been removed.`,
 		willNotLinkAnywhere: (keyword) => `“${keyword}” will not be linked anywhere.`,

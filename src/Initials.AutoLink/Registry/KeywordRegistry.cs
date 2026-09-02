@@ -56,8 +56,6 @@ internal sealed class KeywordRegistry : IKeywordRegistry
 
                 KeywordSnapshot rebuilt = Build();
 
-                // Only swap when the content actually changed. Publishing an unrelated edit on a target page
-                // rebuilds to an identical hash, so the stamp holds still and nothing downstream is invalidated.
                 if (_snapshot is not null && string.Equals(_snapshot.Stamp, rebuilt.Stamp, StringComparison.Ordinal))
                 {
                     _dirty = false;
@@ -83,12 +81,6 @@ internal sealed class KeywordRegistry : IKeywordRegistry
     /// <summary>
     /// Builds every culture's keyword set from the stored keyword rows.
     /// </summary>
-    /// <remarks>
-    /// The rows are the only source. Keywords used to be collected from a Tags property on every target page as
-    /// well, which meant two pages could claim the same phrase and the registry had to report a collision rather
-    /// than guess at one — a whole subsystem for a situation the table cannot represent, since a keyword has one
-    /// row per culture and a row has one destination.
-    /// </remarks>
     private KeywordSnapshot Build()
     {
         AutoLinkOptions options = _options.CurrentValue;
@@ -96,8 +88,6 @@ internal sealed class KeywordRegistry : IKeywordRegistry
 
         try
         {
-            // The stores and Umbraco's services are scoped, so the singleton registry resolves them per rebuild
-            // rather than holding on to one.
             using IServiceScope scope = _scopeFactory.CreateScope();
 
             var umbracoContextFactory = scope.ServiceProvider.GetRequiredService<IUmbracoContextFactory>();
@@ -110,8 +100,6 @@ internal sealed class KeywordRegistry : IKeywordRegistry
             IReadOnlyList<KeywordMapping> allMappings = mappingStore.GetAll();
             IReadOnlyList<KeywordSuppression> allSuppressions = suppressionStore.GetAll();
 
-            // Blocking on the async language service is acceptable here: a rebuild happens on a keyword change,
-            // not per render, and there is no synchronisation context to deadlock against.
             List<string> cultures = languageService
                 .GetAllAsync()
                 .GetAwaiter()
@@ -119,13 +107,8 @@ internal sealed class KeywordRegistry : IKeywordRegistry
                 .Select(language => language.IsoCode)
                 .ToList();
 
-            // Rebuilds are triggered from notification handlers as well as from renders, so there is not
-            // always an ambient context to resolve URLs against.
             using UmbracoContextReference contextReference = umbracoContextFactory.EnsureUmbracoContext();
 
-            // One query for every page any keyword points at, shared across cultures. The tags query used to hand
-            // back published content with its name already attached; without it, a name would otherwise be a
-            // database round trip per keyword per culture.
             IReadOnlyDictionary<Guid, IContent> pages = FetchPages(contentService, allMappings);
 
             foreach (string culture in cultures.Prepend(KeywordSnapshot.InvariantCulture))
@@ -135,7 +118,6 @@ internal sealed class KeywordRegistry : IKeywordRegistry
         }
         catch (Exception ex)
         {
-            // A failed rebuild must not take the site down; render unlinked instead.
             _logger.LogError(ex, "Failed to build the auto-link keyword registry. Rendering without auto-links.");
             return KeywordSnapshot.Empty;
         }
@@ -213,12 +195,6 @@ internal sealed class KeywordRegistry : IKeywordRegistry
     /// <summary>
     /// Turns one stored row into a destination, or nothing when it will not resolve in this culture.
     /// </summary>
-    /// <remarks>
-    /// A row that resolves to nothing drops the keyword from this culture's set rather than failing the build, and
-    /// the Autolink screen reports it as unresolved. That report is the only way anybody would find out that a
-    /// page a keyword points at has been deleted, unpublished, or never published in this language — there is no
-    /// second source to quietly fall back to any more.
-    /// </remarks>
     private KeywordTarget? Resolve(
         string keyword,
         KeywordMapping mapping,
@@ -229,8 +205,6 @@ internal sealed class KeywordRegistry : IKeywordRegistry
     {
         if (mapping.IsExternal)
         {
-            // Revalidated on the way out: a row written by any route other than the API must not be able to
-            // put a hostile scheme in an href.
             if (ExternalUrl.TryNormalise(mapping.ExternalUrl, out string? external))
             {
                 return new KeywordTarget(
@@ -263,8 +237,6 @@ internal sealed class KeywordRegistry : IKeywordRegistry
             return null;
         }
 
-        // A variant page carries a name per language, and the name is what the anchor's title attribute says.
-        // GetCultureName returns null for a page whose type does not vary, hence the fallback.
         pages.TryGetValue(mapping.TargetKey, out IContent? page);
         string name = page?.GetCultureName(culturePart) ?? page?.Name ?? string.Empty;
 

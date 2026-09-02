@@ -5,12 +5,6 @@ namespace Initials.AutoLink.Models;
 /// <summary>
 /// Validation for editor-supplied link destinations.
 /// </summary>
-/// <remarks>
-/// This is a security boundary, not a formatting nicety. Every URL the linker emitted before external links came
-/// from Umbraco resolving a node; this is the first time a string somebody typed lands in an href, which makes
-/// <c>javascript:</c> and <c>data:</c> an XSS vector. Checked when the row is saved and again when the registry
-/// builds, so a row written by any other route cannot render a hostile scheme.
-/// </remarks>
 internal static class ExternalUrl
 {
     /// <summary>

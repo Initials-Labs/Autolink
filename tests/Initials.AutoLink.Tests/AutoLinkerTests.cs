@@ -27,7 +27,6 @@ public class AutoLinkerTests
         AutoLinker linker = TestLinker.Create(TestLinker.Set(TestLinker.Page("Umbraco")));
         const string markup = "<p>Nothing of interest here.</p>";
 
-        // Reference equality matters: the value converter skips re-wrapping when the string is unchanged.
         Assert.Same(markup, linker.ProcessMarkup(markup));
     }
 
@@ -65,7 +64,6 @@ public class AutoLinkerTests
     {
         AutoLinker linker = TestLinker.Create(TestLinker.Set(TestLinker.Page("Umbraco")));
 
-        // The word appears only in an attribute, so the raw-string prefilter matches but nothing should change.
         const string markup = "<p><img src=\"/media/Umbraco.png\" alt=\"logo\" /></p>";
 
         Assert.Same(markup, linker.ProcessMarkup(markup));
@@ -195,8 +193,6 @@ public class AutoLinkerTests
     [Fact]
     public void A_suppressed_keyword_reserves_its_span_so_a_shorter_one_cannot_take_it()
     {
-        // "content editor" is switched off everywhere; "editor" resolves to a page. Switching a keyword off must
-        // not promote a shorter keyword onto the same words, so the phrase stays plain.
         CultureKeywordSet set = TestLinker.Set(
             [TestLinker.Page("content editor", "/roles/"), TestLinker.Page("editor", "/about/")],
             [TestLinker.Suppression("content editor", Guid.Empty)]);

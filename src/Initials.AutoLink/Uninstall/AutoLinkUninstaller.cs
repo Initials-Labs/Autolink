@@ -30,24 +30,6 @@ public interface IAutoLinkUninstaller
 }
 
 /// <inheritdoc />
-/// <remarks>
-/// Umbraco has no uninstall hook for a package delivered over NuGet: removing the reference removes the assembly and
-/// leaves the tables. So teardown is an explicit action rather than something that happens on its own.
-/// <para>
-/// The part that is easy to get wrong is the migration state. Dropping the tables while leaving the plan recorded as
-/// complete in umbracoKeyValue means a reinstall never recreates them, and the package comes back up permanently
-/// broken with a store that logs and returns empty. Resetting the state to the plan's initial value is what makes a
-/// reinstall work.
-/// </para>
-/// Document types are deliberately left alone, and only this plan is rewound — not the <c>Initials.AutoLink.Schema</c> plan
-/// that added the scan opt-out property. Rewinding that one would have a reinstall re-add a property somebody may
-/// have removed on purpose, and re-adding schema is not what "remove the data" means.
-/// <para>
-/// Worth being clear about what this does destroy. These two tables are the only place keywords live, so a teardown
-/// is not "lose the overrides and keep the keywords" — it is all of them. That is the right behaviour for removing a
-/// package and the wrong thing to run by accident, which is what the confirmation token on the endpoint is for.
-/// </para>
-/// </remarks>
 internal sealed class AutoLinkUninstaller : IAutoLinkUninstaller
 {
     private readonly IScopeProvider _scopeProvider;
@@ -78,8 +60,6 @@ internal sealed class AutoLinkUninstaller : IAutoLinkUninstaller
 
         using (IScope scope = _scopeProvider.CreateScope(autoComplete: true))
         {
-            // DROP TABLE IF EXISTS rather than a syntax provider probe: supported by SQLite and by every SQL Server
-            // version Umbraco 17 runs on, and it keeps the teardown idempotent.
             scope.Database.Execute($"DROP TABLE IF EXISTS {KeywordMappingDto.TableName}");
             scope.Database.Execute($"DROP TABLE IF EXISTS {KeywordSuppressionDto.TableName}");
         }
@@ -88,7 +68,6 @@ internal sealed class AutoLinkUninstaller : IAutoLinkUninstaller
 
         _keyValueService.SetValue(upgrader.StateValueKey, plan.InitialState);
 
-        // Whatever the registry was holding is now built on tables that no longer exist.
         _invalidator.InvalidateEverywhere();
 
         _logger.LogWarning(
@@ -101,14 +80,6 @@ internal sealed class AutoLinkUninstaller : IAutoLinkUninstaller
     /// <summary>
     /// Drops the relation type and every relation written under it.
     /// </summary>
-    /// <remarks>
-    /// Deleting the type takes its relations with it, but they are cleared first regardless: this runs against
-    /// whatever state the database is actually in, and a half-finished install with relations and no type is
-    /// exactly the case a teardown exists to mop up.
-    /// <para>
-    /// Only ours. Relation types Umbraco ships, and any somebody else made, are none of this method's business.
-    /// </para>
-    /// </remarks>
     private void RemoveRelations()
     {
         try
@@ -127,9 +98,6 @@ internal sealed class AutoLinkUninstaller : IAutoLinkUninstaller
         }
         catch (Exception ex)
         {
-            // The tables are the data; the relations are bookkeeping over content that still exists. Failing here
-            // must not leave the tables dropped but the migration state untouched, which is the one combination
-            // that comes back broken.
             _logger.LogError(ex, "Could not remove the auto-link relation type. Delete it by hand in Settings.");
         }
     }
