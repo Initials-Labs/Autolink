@@ -1,6 +1,6 @@
 # Initials.AutoLink
 
-Turns keyword mentions in Umbraco rich text into links to the corresponding page, **as the page is served**.
+Turns keyword mentions in Umbraco rich text and markdown into links to the corresponding page, **as the page is served**.
 No editor action, no property on your document types, and stored markup is never modified.
 
 An editor writes "we tested this with Claude AI last week". If the keyword `Claude AI` points at a page, the
@@ -8,6 +8,9 @@ phrase renders as a link to it. The editor did nothing.
 
 Write it *before* that page exists and the link appears the day somebody adds the keyword. No republishing, no
 backfill, no dead anchors when a target goes away — because nothing was ever baked into the content.
+
+**[Watch it being set up](https://youtu.be/gctVM0lDkFc)** — a video walkthrough of installing the package and
+getting the first keyword linking.
 
 Requires **Umbraco 17** on **.NET 10**.
 
@@ -84,7 +87,7 @@ match and no property alias to get right.
 ```
 
 Bound through `IOptionsMonitor`, so edits apply without a restart. The full set of options, including the optional
-`excludeFromAutoLinking` property for pages that should not be scanned at all, is documented on `AutoLinkOptions` —
+`excludeFromAutoLinking` property for pages that should not be scanned at all, is documented on `AutoLinkOptions.cs` —
 the package ships its XML docs, so your IDE has them.
 
 ## Telemetry
@@ -118,6 +121,7 @@ Document types are left alone, so `excludeFromAutoLinking` and any values in it 
 
 | Document | What it covers |
 |---|---|
+| [Setup video](https://youtu.be/gctVM0lDkFc) | How to set up the package, start to finish, on video. |
 | [Technical specification](https://github.com/Initials-Labs/Autolink/blob/main/docs/technical-spec.md) | A developer's map: component by component, the render path, the data model, the migrations. |
 | [Build log](https://github.com/Initials-Labs/Autolink/blob/main/docs/build-log.md) | How it was built and verified, with evidence, measurements and the Umbraco 17 traps that cost the most time. |
 | [Design decisions](https://github.com/Initials-Labs/Autolink/blob/main/CLAUDE.md) | Why it renders instead of publishing, why not Examine, and what the rejected alternatives were. |
