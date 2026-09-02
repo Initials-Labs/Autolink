@@ -6,11 +6,6 @@ namespace Initials.AutoLink.Persistence;
 /// <summary>
 /// A decision that a keyword should not be linked, either on one page or anywhere.
 /// </summary>
-/// <remarks>
-/// <c>pageKey</c> uses <see cref="Guid.Empty"/> rather than null for "everywhere". A nullable column in a unique
-/// index behaves differently across providers — SQL Server treats two nulls as equal, SQLite treats them as
-/// distinct — so the sentinel keeps the index meaning the same on both.
-/// </remarks>
 [TableName(TableName)]
 [PrimaryKey("id", AutoIncrement = true)]
 [ExplicitColumns]

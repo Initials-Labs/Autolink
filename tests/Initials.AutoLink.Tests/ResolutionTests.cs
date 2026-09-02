@@ -98,8 +98,6 @@ public class ResolutionTests
     [Fact]
     public void The_narrowest_suppression_row_is_the_one_offered()
     {
-        // Switched off on this page for this culture, and separately everywhere for all cultures. Lifting should
-        // target the page row first, so the editor makes progress rather than appearing to do nothing.
         KeywordSuppression page = TestLinker.Suppression("hello", Page, "en-GB");
         KeywordSuppression global = TestLinker.Suppression("hello", Guid.Empty);
 
@@ -143,8 +141,6 @@ public class ResolutionTests
 
         Assert.Equal(1, state.ReportsFor("hello", AutoLinkSkipReason.SelfLink));
 
-        // A different reason for the same keyword is tallied separately, so "linked once" and "not linked here"
-        // can both be reported.
         Assert.Equal(0, state.ReportsFor("hello", AutoLinkSkipReason.LimitReached));
     }
 
@@ -155,7 +151,6 @@ public class ResolutionTests
 
         state.RecordReport("hello", AutoLinkSkipReason.Suppressed);
 
-        // A mention that was not linked must not spend the allowance.
         Assert.Equal(0, state.CountFor("hello"));
         Assert.Equal(0, state.TotalLinks);
     }

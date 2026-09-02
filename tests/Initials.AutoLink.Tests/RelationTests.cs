@@ -33,8 +33,6 @@ public class RelationTests
 
         Reconcile(service, Page(Mentioning, "en-GB", Linked("Umbraco", Target)));
 
-        // Parent is the page doing the mentioning, child is the page it links to — the same way round Umbraco
-        // stores a Content Picker reference. Inverted, the delete warning fires on the wrong page entirely.
         service.Received(1).Relate(MentioningId, TargetId, type);
     }
 
@@ -58,7 +56,6 @@ public class RelationTests
     {
         (IRelationService service, _) = Service();
 
-        // An external target carries an empty key, which is how the linker represents "not a page".
         Reconcile(service, Page(Mentioning, "en-GB", Linked("Umbraco", Guid.Empty)));
 
         service.DidNotReceive().Relate(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<IRelationType>());
@@ -67,7 +64,6 @@ public class RelationTests
     [Fact]
     public void The_same_pair_in_two_cultures_is_one_relation()
     {
-        // umbracoRelation has no culture column, so a page linking to another in both languages is one row, not two.
         (IRelationService service, IRelationType type) = Service();
 
         Reconcile(
@@ -108,7 +104,6 @@ public class RelationTests
     [Fact]
     public void A_missing_relation_type_is_reported_rather_than_thrown()
     {
-        // The migration has not run. A scan is still a valid answer; it just is not being recorded.
         var service = Substitute.For<IRelationService>();
         service.GetRelationTypeByAlias(AutoLinkRelation.Alias).Returns((IRelationType?)null);
 
@@ -122,8 +117,6 @@ public class RelationTests
     [Fact]
     public void Deleting_a_page_removes_its_relations_in_both_directions()
     {
-        // Both directions on purpose. The deleted page might be the target other pages linked to, or one of the
-        // pages doing the linking, and either way the rows naming it are now about a node that does not exist.
         IRelation asTarget = Relation(MentioningId, TargetId);
         IRelation asMentioner = Relation(TargetId, OtherId);
 
@@ -140,7 +133,6 @@ public class RelationTests
     [Fact]
     public void The_pages_linking_to_one_are_the_parents_of_its_relations()
     {
-        // Read the way round they are written: this page is the child, the pages mentioning it are the parents.
         IRelation inbound = Relation(MentioningId, TargetId);
         IRelation outbound = Relation(TargetId, OtherId);
 

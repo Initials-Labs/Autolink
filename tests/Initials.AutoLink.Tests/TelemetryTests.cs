@@ -89,7 +89,6 @@ public class TelemetryTests
     [Fact]
     public void Empty_stores_report_zeros_rather_than_nothing()
     {
-        // A site with the package installed and no keywords yet is still a data point.
         var report = Report(Provider());
 
         Assert.Equal(5, report.Count);
@@ -99,9 +98,6 @@ public class TelemetryTests
     [Fact]
     public void Payload_is_counts_only_and_every_key_is_prefixed()
     {
-        // The interesting assertion in this file. The report is a flat bag shared with every other provider on the
-        // site and it leaves the building, so nothing here may be a string the editor typed, and nothing may
-        // collide with a core key.
         IEnumerable<UsageInformation> report = Provider(
             mappings: [Page("Client Name", "en-GB"), External("Secret Project", "https://client.example")],
             suppressions: [OnPage("Client Name")]).GetInformation();
@@ -112,11 +108,6 @@ public class TelemetryTests
             Assert.IsType<int>(u.Data);
         });
     }
-
-    // Not tested here: that Umbraco only includes these at the Detailed level. That is UsageInformationService's
-    // behaviour, and the class is internal to Umbraco, so a test would have to reach it by reflection and would be
-    // testing their code with ours as the fixture. The registration is verified by booting the site in Development,
-    // where the service provider validates the graph on build.
 
     [Fact]
     public void A_store_that_throws_reports_nothing_instead_of_failing_the_job()

@@ -17,8 +17,6 @@ internal sealed class AdministratorHandler : AuthorizationHandler<AdministratorR
         AuthorizationHandlerContext context,
         AdministratorRequirement requirement)
     {
-        // TryGetUmbracoUser for the same reason as the section handler: the throwing overload turns an anonymous
-        // request into a 500 instead of a 401.
         if (_authorizationHelper.TryGetUmbracoUser(context.User, out IUser? user)
             && user.Groups.Any(group =>
                 string.Equals(group.Alias, Constants.Security.AdminGroupAlias, StringComparison.Ordinal)))

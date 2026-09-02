@@ -11,6 +11,9 @@ Keywords are managed in one place, a custom **Auto-linking** section, using Umbr
 one at a page or at an address outside the site. Nothing is added to your document types and there is nothing for an
 editor to fill in per page.
 
+**[Watch it being set up](https://youtu.be/gctVM0lDkFc)** — a video walkthrough of installing the package and
+getting the first keyword linking.
+
 ## Layout
 
 | Path | What it is |

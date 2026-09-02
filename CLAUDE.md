@@ -232,8 +232,8 @@ doctype. Most target-page edits don't touch keywords or URLs, and a typo fix in 
 copy shouldn't nuke site-wide cached output. Build dictionary → hash keyword set +
 resolved URLs → only bump if different.
 
-Hooked from `ContentPublishedNotification`, `ContentUnpublishedNotification`,
-`ContentDeletedNotification`.
+Hooked from `ContentCacheRefresherNotification`, not from the publish/unpublish/delete notifications the original
+design named — the field notes below have the two production reasons (cache settling, and other servers).
 
 ### Wrapping property value converter
 
@@ -405,6 +405,197 @@ accept that retroactive links appear on natural TTL expiry.
 
 **SEO.** Real argument for capping links per page. `data-autolink` marking exists so
 links can be audited or stripped wholesale if search engines get grumpy.
+
+---
+
+## Field notes
+
+The source carries **no narrative comments by policy**: `<summary>` docs stay everywhere (on public types they
+ship in the nupkg as IntelliSense; on internal ones they are the one-line signpost), while narrative `<remarks>`
+on internal types and every inline comment live here instead. If a change makes one of these wrong, fix it here
+in the same commit.
+
+### The linker
+
+- Scan-time suppression is an `AsyncLocal`, not a field: a scan reads many pages inside one async flow and must
+  not switch linking off for front-end requests being served concurrently. Reading a converted property value
+  runs the value converter — which is where linking happens — so without this the scan would double-link and
+  spend the page budget before its own preview ran.
+- A cheap raw-string regex scan gates the AngleSharp parse. Most markup contains no keyword at all; a false
+  positive inside an attribute only costs a parse.
+- Markup is parsed into a detached div because that gives a stable InnerHtml round trip. Any parse failure is
+  caught: a markup edge case must never take down a render.
+- Precedence inside one property: anything the editor hand-linked wins (already pointing at the target means no
+  second link); a page never links to itself; a suppressed mention is reported (naming the suppression row
+  actually in force, so the audit lifts that one) but does not burn the keyword's allowance; the budget check
+  runs last so a rejected candidate spends nothing. `match.Value` is what lands in the anchor, so the editor's
+  casing is preserved.
+- External links get `data-autolink-external` as a *second* attribute rather than a different value for
+  `data-autolink`, so anything keying on the first keeps working. Outside a request (background render, unit
+  test) the budget applies per call.
+- `Preview` throws away the rewritten markup; only the reported placements matter.
+- `KeywordMatcher` is its own type so longest-first and per-keyword word boundaries are tested directly, and so
+  the registry and the tests cannot disagree about what is matchable. Suppressed keywords stay in the automaton
+  and reserve their span (decision 5); an unresolved keyword is absent and reserves nothing.
+- "First occurrence per page" state (`AutoLinkRequestState`) also tallies skip *reports* separately per reason,
+  capped, so five mentions produce one row per reason instead of five identical ones.
+
+### Registry and invalidation
+
+- The rebuilt snapshot is only swapped in when its content hash differs, so re-saving the same destination or
+  publishing an unrelated edit on a target page holds the stamp still and invalidates nothing downstream.
+- The singleton registry resolves scoped services (stores, `IUmbracoContextFactory`, URL provider) from a fresh
+  `IServiceScope` per rebuild. Blocking on the async `ILanguageService` is fine there: rebuilds happen on keyword
+  changes, not per render, and there is no synchronisation context to deadlock against.
+- One `IContentService.GetByIds` fetches every target page, shared across cultures; `GetCultureName` returns
+  null for a non-varying page, hence the `Name` fallback. A failed rebuild logs and returns the empty snapshot —
+  render unlinked rather than take the site down.
+- Invalidation is hooked to `ContentCacheRefresherNotification`, **not** `ContentPublished`: published fires
+  inside the publish before the cache settles (a render at that moment could rebuild stale and mark itself
+  clean), and it only fires on the publishing server — the refresher runs on every node via the distributed
+  cache. The package's own `AutoLinkCacheRefresher` exists for the same reason: a keyword decision saved through
+  the API otherwise invalidated only the node that served the request.
+
+### Persistence
+
+- A missing table (migration not yet run) degrades instead of throwing: the mapping store returns no keywords
+  (site behaves as if the package were absent), the suppression store returns none (a link that should be
+  suppressed is visible and fixable). Both are survivable in a way a failed request is not.
+- The stores invalidate the registry themselves — they are the code that knows rows changed, and an invalidation
+  nobody sends leaves other servers resolving the old way until the next content change.
+- `keywordKey` is stored lower-cased next to the display-cased `keyword` because SQLite text comparison is
+  case-sensitive and SQL Server's default collation is not; the unique index rides the lower-cased copy.
+  Suppression `pageKey` uses `Guid.Empty` (not null) for "everywhere" because providers disagree on nulls in
+  unique indexes. Suppressing twice is the same decision, not an error.
+- Schema changes rebuild the table (read rows out, drop, recreate from the DTO, put rows back) because Umbraco's
+  migration layer refuses `ALTER TABLE` on SQLite outright.
+- `AddKeywordRelationType` guards by alias *and* by name: `umbracoRelationType` has a unique index on both, a
+  foreign relation type carrying our display name would fail the insert, and a failed migration re-runs every
+  boot. A name collision is reported and skipped — that relation type is not ours to adopt or rename.
+
+### Scanning and relations
+
+- The scan enumerates keys from `IContentService` because the published cache exposes no root enumeration, then
+  reads pages from the published cache. An invariant page is examined once per site language, not once: it is
+  served in every language and the renderer picks keywords by request culture. Scanning it invariantly was a
+  real gap — a non-varying page rendered links and appeared nowhere in the report.
+- The `VariationContext` is what selects a culture for variant values nested inside blocks, where there is no
+  per-call culture argument.
+- One `AutoLinkRequestState` per page per culture, shared across all its rich text properties, so the report
+  honours the caps exactly as a request would. An unroutable variant is recorded, not dropped — "my page is
+  missing from the report" is otherwise unanswerable. One broken property logs and continues. No short-circuit
+  on an empty snapshot: "0 pages scanned" on a walk that never happened reads as a broken scan.
+- Relations: written from the scan (render-time writing would mean database writes on the front end), only for
+  mentions that actually became anchors, deduplicated across cultures (`umbracoRelation` has no culture column).
+  The mentioning page is the **parent** — decision 9 has the direction trap. A duplicate pair self-heals: keep
+  the first, the rest fall into the removal set. A missing relation type logs and skips — the scan report is
+  still correct, it just is not recorded. External targets have no node, so no relation.
+- The delete/trash warning handler covers the one case with no relation behind it: a keyword pointing at a page
+  nothing mentions yet. It warns, never cancels. The `ContentDeleted` cleanup is a backstop that normally finds
+  nothing — Umbraco clears a node's relations during the delete (verified 17.6.1 on SQLite: no `ON DELETE
+  CASCADE`; the delete itself does it).
+
+### Install, uninstall and migrations
+
+- Two migration plans because they answer independent questions: the decision tables belong to every install and
+  run unconditionally; the opt-out schema is configuration-driven, and a plan step is spent for good — consuming
+  it before anything is nominated would mean a site configured later never gets the property. The handler
+  executes the schema plan only once the feature is configured, logs failures per plan (they fail for unrelated
+  reasons), and does nothing mid-install/upgrade — Umbraco starts us again after.
+- `InstallAutoLinkSchema` is a migration, not a startup handler: doing it per boot meant editing document types
+  every start, and under `InMemoryAuto` models it regenerated models beneath compiled views so the first page
+  load after install failed. Everything in it is additive and idempotent; a nominated doctype that does not
+  exist *throws deliberately*, leaving the plan state to retry next boot, because unattended installs import
+  starter kits around the same time and a one-shot that gave up quietly leaves a site that scans nothing.
+- `RemoveLegacyKeywordProperty` is the one place the package deletes data, scoped by *datatype* (only properties
+  bound to the datatype this package created), datatype removed last and only when unbound, through the service
+  layer so caches stay consistent. `cmsTags` rows survive — core has no unused-tag collection, they are inert,
+  and going at the tag tables directly is not worth it. The exclude boolean stays.
+- Teardown exists because NuGet removal has no uninstall hook. The dangerous half is migration *state*: dropping
+  tables while `umbracoKeyValue` still says the plan completed means a reinstall never recreates them. Only the
+  main plan is rewound — rewinding the schema plan would re-add a property somebody removed on purpose. `DROP
+  TABLE IF EXISTS` is used because SQLite and every supported SQL Server accept it and it keeps teardown
+  idempotent; relations are cleared before the type even though deleting the type would cascade, because a
+  half-finished install is exactly what teardown mops up; the registry is invalidated after, since its snapshot
+  is built on tables that no longer exist. Failing relation cleanup must not leave tables dropped but state
+  untouched — the one combination that comes back broken. `TeardownResult` reports no per-table flag because a
+  DDL affected-row count cannot vary with the truth.
+
+### API and security
+
+- Both authorization handlers use `TryGetUmbracoUser`, not `GetUmbracoUser`: the throwing overload turns an
+  anonymous request into a 500 instead of a 401.
+- Umbraco's own section-access requirement type is internal, so the package brings its own; the check is the
+  same one (section alias against `IUser.AllowedSections`). Teardown is a separate authorization concept —
+  the group using the dashboard daily is exactly the group that should not be able to drop both tables, and the
+  confirmation token prevents an accident, not a permission.
+- The keywords endpoint resolves rows against the registry snapshot so the screen cannot disagree with the
+  renderer; unresolved rows are returned and marked, because they are the thing needing attention. External URLs
+  are validated at save *and* at registry build (decision 7): the first editor-typed string in an href is an XSS
+  boundary. Keyword max length matches the column so an over-long keyword is a 400, not a database error.
+- The scan endpoint treats relation reconciliation as bookkeeping: its failure must not turn a good scan into a
+  failed request. Mutation endpoints are idempotent. Swagger config: 17.6.1 ships Microsoft.OpenApi 2.x, where
+  `OpenApiInfo` is no longer under `.Models`.
+- Skip reasons are stable codes, not sentences, so the screen can phrase and count them; every one used to be a
+  silent skip, which made the audit impossible to trust.
+
+### Telemetry
+
+- Not telemetry of our own: Umbraco's `ReportSiteJob` collects every `IDetailedTelemetryProvider` and posts to
+  telemetry.umbraco.com under the site owner's chosen level; nothing runs below `Detailed` and the package
+  author never sees it. Counts only — a keyword is editorial content and a destination URL can identify a
+  client. Every key carries the `AutoLink` prefix because the report is a flat bag shared with every provider.
+  Safe pre-migration (stores return empty), and everything else is caught: telemetry must never fail a health
+  job. That Umbraco gates on `Detailed` is deliberately untested — it would be testing their internal class
+  with ours as the fixture; registration is proven by booting in Development, where the provider graph validates.
+
+### The dashboard (autolink-keywords.js, lang/en.js)
+
+- `.mention` is a positional four-column grid (name | path | status | action). Children map to columns by
+  position, so anything added to a row must share an existing cell (the culture pill lives inside the `.place`
+  span with the URL) or every later child shifts a column — this has happened.
+- Page-name anchors point at the document workspace. The variant segment is load-bearing: a culture for a
+  variant document, the literal `invariant` otherwise, and the wrong one renders a *blank workspace*, not an
+  error — which is why the API models carry `VariesByCulture`. No `target="_blank"` on those anchors: an in-app
+  click soft-navigates through Umbraco's router, and a cold deep-link to a workspace is exactly what renders
+  blank. Front-end URL anchors keep `target="_blank"`.
+- Mentions on the all-languages tab include every culture's scan rows (grouped by page *and* culture): scan rows
+  always carry a concrete culture, so an exact match against the empty tab culture would report everything as
+  mentioned nowhere.
+- Stored rows carry lower-cased cultures (index keys); `#displayCulture` maps them back to the registry's
+  spelling before showing or routing.
+- Localization terms that need values are **functions** — the old `%0%` token style renders literally from
+  v14 on. `en.js` registers as base `en`, so it resolves for every English variant; a new language is a copy of
+  the file plus a `umbraco-package.json` registration.
+- The `?v=` cache-busters are the only thing getting a consumer's browser off a cached dashboard: the backoffice
+  pins modules to their URL hard enough that even a hard reload can serve stale JS. When iterating locally, tick
+  "Disable cache" in DevTools.
+
+### Packaging and CI
+
+- csproj: the Umbraco dependency range is a floor *and* a ceiling (`[17.6.1, 18)`) — a bare minimum would let
+  NuGet resolve against 18 and fail at runtime instead of restore. AngleSharp flows to consumers deliberately:
+  the HTML walk is the package. README and icon pack to the nupkg root, which is where `PackageReadmeFile` and
+  `PackageIcon` expect them. `ManagePackageVersionsCentrally=false` because the project sits outside the
+  `Autolink/` folder that owns `Directory.Packages.props`. CS1591 is excluded rather than answered — ninety-odd
+  DI constructors, and a comment written to silence a warning is worse than none.
+- The version lives in the csproj, the manifest's `version`, and a `?v=` cache-buster on every asset path in the
+  manifest; `tools/bump-version.ps1` moves them all together and the build workflow fails on drift. Don't state
+  the count anywhere — it has gone stale twice.
+- build.yml runs on every branch push but **not** tags (`branches: ['**']`) — tags belong to release.yml, which
+  re-runs restore/build/test itself rather than trusting a parallel run was green. The marketplace listing file
+  is schema-validated (`--regex-variant python`: Umbraco's schema contains a `\:` escape that strict ECMA regex
+  rejects), and the pack is checked for the manifest, dashboard, XML docs, README and icon — the things that
+  silently break a package.
+- release.yml: tag must equal the csproj version (nuget.org versions are immutable — a mispush can only be
+  unlisted); trusted publishing exchanges the job's OIDC token for a short-lived key via `NuGet/login@v1`, whose
+  `user` is the **policy creator** (`scottishcoder`), not the `initials-labs` org that owns the package — the
+  org name 401s. The policy names the repo and the workflow *filename*, so renaming release.yml breaks the
+  exchange. Pushing the nupkg pushes the snupkg beside it; `--skip-duplicate` makes a rerun of a half-failed
+  release safe.
+- The Clean site only boots properly with `ASPNETCORE_ENVIRONMENT=Development` set — the connection string lives
+  in appsettings.Development.json, and without it the site serves the install wizard with 200s. `article.cshtml`
+  renders the `markdownTest` property weakly typed as a verification harness; inert on a fresh clone.
 
 ---
 

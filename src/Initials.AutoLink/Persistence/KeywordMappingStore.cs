@@ -49,9 +49,6 @@ internal sealed class KeywordMappingStore : IKeywordMappingStore
         }
         catch (Exception ex)
         {
-            // Most likely the migration has not run yet. Render unlinked rather than taking the whole registry
-            // down with us: no keywords is a site that behaves as though the package were not installed, which is
-            // survivable in a way that a failed request is not.
             _logger.LogError(ex, "Could not read the auto-link keywords. Nothing will be auto-linked.");
             return [];
         }
@@ -70,10 +67,6 @@ internal sealed class KeywordMappingStore : IKeywordMappingStore
 
         Write(DecisionKey.Normalise(trimmed), trimmed, culture, destination, updatedBy);
 
-        // Invalidated here rather than by the caller. This is the code that knows the rows changed, and an
-        // invalidation nobody sends leaves every other server resolving the keyword the old way until the next
-        // content change. The stamp is a content hash, so re-saving the same destination costs a rebuild and
-        // nothing else.
         _invalidator.InvalidateEverywhere();
     }
 
@@ -123,10 +116,6 @@ internal sealed class KeywordMappingStore : IKeywordMappingStore
 
         if (removed)
         {
-            // Invalidated here rather than by the caller. This is the code that knows the rows changed, and an
-            // invalidation nobody sends leaves every other server resolving the keyword the old way until the next
-            // content change. The stamp is a content hash, so re-saving the same decision costs a rebuild and nothing
-            // else.
             _invalidator.InvalidateEverywhere();
         }
 

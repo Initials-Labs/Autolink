@@ -16,18 +16,6 @@ namespace Initials.AutoLink.Notifications;
 /// <summary>
 /// Runs the package's migration plans at startup.
 /// </summary>
-/// <remarks>
-/// Two plans, because they answer independent questions. <see cref="AutoLinkMigrationPlan"/> creates the decision
-/// tables and belongs to every install. <see cref="AutoLinkSchemaMigrationPlan"/> creates the keyword datatype and
-/// properties, and is only executed once somebody has nominated document types for it — a plan step is spent for
-/// good, so consuming it on an install that has configured nothing would mean a site that configured the feature
-/// afterwards never got the schema.
-/// <para>
-/// Failures are logged per plan rather than thrown. A missing decision table degrades to automatic resolution and a
-/// failed schema install degrades to properties somebody adds by hand; neither is a reason to stop boot. Logging
-/// them separately matters because they fail for unrelated reasons and one must not hide the other.
-/// </para>
-/// </remarks>
 internal sealed class AutoLinkMigrationHandler : INotificationAsyncHandler<UmbracoApplicationStartedNotification>
 {
     private readonly ICoreScopeProvider _scopeProvider;
@@ -57,7 +45,6 @@ internal sealed class AutoLinkMigrationHandler : INotificationAsyncHandler<Umbra
     {
         if (_runtimeState.Level != RuntimeLevel.Run)
         {
-            // Mid-install or mid-upgrade. Umbraco will start us again once it is done.
             return;
         }
 

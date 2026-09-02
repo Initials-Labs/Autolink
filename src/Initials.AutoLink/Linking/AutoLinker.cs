@@ -25,8 +25,6 @@ internal sealed class AutoLinker : IAutoLinker
     private readonly ILogger<AutoLinker> _logger;
     private readonly HtmlParser _parser = new();
 
-    // AsyncLocal rather than a field: a scan reads many pages inside one async flow, and must not switch
-    // linking off for concurrent front-end requests being served at the same time.
     private static readonly AsyncLocal<bool> ScanInProgress = new();
 
     public AutoLinker(
@@ -70,7 +68,6 @@ internal sealed class AutoLinker : IAutoLinker
 
         try
         {
-            // The rewritten markup is thrown away. Only the placements it reports matter.
             Rewrite(markup, set, _options.CurrentValue, currentPageKey, state, placements);
         }
         catch (Exception ex)
@@ -89,16 +86,12 @@ internal sealed class AutoLinker : IAutoLinker
             return markup;
         }
 
-        // Which keywords apply depends on the culture being rendered: "hello" and "bonjour" are different sets
-        // pointing at different URLs for the same pages.
         CultureKeywordSet set = _registry.Current.For(CurrentCulture());
         if (set.IsEmpty)
         {
             return markup;
         }
 
-        // Cheap gate before the expensive one. Most markup contains no keyword at all, and a regex scan over
-        // the raw string is far cheaper than a parse. A false positive inside an attribute only costs a parse.
         if (!set.Matcher!.IsMatch(markup))
         {
             return markup;
@@ -124,7 +117,6 @@ internal sealed class AutoLinker : IAutoLinker
         }
         catch (Exception ex)
         {
-            // Never let a markup edge case take down a page render.
             _logger.LogError(ex, "Autolink failed for a rich text property. Returning the original markup.");
             return markup;
         }
@@ -141,10 +133,8 @@ internal sealed class AutoLinker : IAutoLinker
         IHtmlDocument document = _parser.ParseDocument(string.Empty);
         IElement container = document.CreateElement("div");
 
-        // Parsing into a detached div gives a stable round trip: InnerHtml in, InnerHtml out.
         container.InnerHtml = markup;
 
-        // Anything the editor linked by hand wins. If they already pointed at the target, do not add a second link.
         HashSet<string> existingHrefs = container
             .QuerySelectorAll("a[href]")
             .Select(a => a.GetAttribute("href") ?? string.Empty)
@@ -165,8 +155,6 @@ internal sealed class AutoLinker : IAutoLinker
 
             if (insideSkipped && placements is null)
             {
-                // Rendering: nothing to do inside a heading or an anchor. An audit still looks, so it can say why
-                // a mention sitting in one was left alone.
                 continue;
             }
 
@@ -226,8 +214,6 @@ internal sealed class AutoLinker : IAutoLinker
 
             if (!set.Targets.TryGetValue(match.Value, out KeywordTarget? target))
             {
-                // Unreachable in practice: the matcher is built from the resolved keywords and nothing else. It
-                // stays because the alternative to a mismatch between the two is a null reference mid-render.
                 continue;
             }
 
@@ -243,28 +229,23 @@ internal sealed class AutoLinker : IAutoLinker
                 continue;
             }
 
-            // Never link a page to itself.
             if (currentPageKey is not null && target.TargetKey == currentPageKey.Value)
             {
                 Report(placements, state, options, target, match.Value, AutoLinkSkipReason.SelfLink);
                 continue;
             }
 
-            // The editor already linked to this target somewhere in this property.
             if (existingHrefs.Contains(target.Url))
             {
                 Report(placements, state, options, target, match.Value, AutoLinkSkipReason.HandLinked);
                 continue;
             }
 
-            // Suppressed by an editorial decision, globally or on this page alone. Reported so the audit can
-            // offer to lift it, but it does not burn the keyword's allowance.
             if (set.IsSuppressed(target.Keyword, currentPageKey))
             {
                 if (placements is not null
                     && state.ReportsFor(target.Keyword, AutoLinkSkipReason.Suppressed) < options.MaxLinksPerKeyword)
                 {
-                    // Name the row actually in force, so the audit lifts that one rather than a guess at its scope.
                     KeywordSuppression? row = set.FindSuppression(target.Keyword, currentPageKey);
 
                     placements.Add(new AutoLinkPlacement(
@@ -283,7 +264,6 @@ internal sealed class AutoLinker : IAutoLinker
                 continue;
             }
 
-            // Budget check last, so a rejected candidate does not burn the keyword's single allowance.
             if (state.CountFor(target.Keyword) >= options.MaxLinksPerKeyword)
             {
                 Report(placements, state, options, target, match.Value, AutoLinkSkipReason.LimitReached);
@@ -304,8 +284,6 @@ internal sealed class AutoLinker : IAutoLinker
 
             if (target.IsExternal)
             {
-                // A second attribute rather than a different value for the first, so anything already keying on
-                // data-autolink keeps working while external links can still be styled or audited on their own.
                 anchor.SetAttribute("data-autolink-external", "true");
 
                 if (target.Rel is { Length: > 0 } rel)
@@ -314,7 +292,6 @@ internal sealed class AutoLinker : IAutoLinker
                 }
             }
 
-            // match.Value, not target.Keyword — the editor's casing is preserved.
             anchor.TextContent = match.Value;
 
             replacement.Add(anchor);
@@ -438,7 +415,6 @@ internal sealed class AutoLinker : IAutoLinker
     {
         if (!_requestCache.IsAvailable)
         {
-            // Outside a request (a background render, or a unit test). Budget applies per call.
             return new AutoLinkRequestState();
         }
 

@@ -8,10 +8,6 @@ namespace Initials.AutoLink.Persistence.Migrations;
 /// <summary>
 /// Adds the external link columns to the mapping table.
 /// </summary>
-/// <remarks>
-/// Rebuilt rather than altered, for the same reason as the culture migration: Umbraco's migration layer refuses
-/// ALTER TABLE outright on SQLite. Existing rows are page mappings, so the new columns are simply left null.
-/// </remarks>
 internal sealed class AddExternalLinkColumns : AsyncMigrationBase
 {
     public AddExternalLinkColumns(IMigrationContext context) : base(context)

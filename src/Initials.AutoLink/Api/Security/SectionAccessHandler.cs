@@ -16,8 +16,6 @@ internal sealed class SectionAccessHandler : AuthorizationHandler<SectionAccessR
         AuthorizationHandlerContext context,
         SectionAccessRequirement requirement)
     {
-        // TryGetUmbracoUser, not GetUmbracoUser: the latter throws for a principal that is not a backoffice
-        // user, which turns an anonymous request into a 500 instead of a 401.
         if (_authorizationHelper.TryGetUmbracoUser(context.User, out IUser? user)
             && user.AllowedSections.Contains(requirement.SectionAlias, StringComparer.Ordinal))
         {

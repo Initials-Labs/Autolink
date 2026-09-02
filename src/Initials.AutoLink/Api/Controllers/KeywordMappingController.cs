@@ -58,8 +58,6 @@ public sealed class KeywordMappingController : AutoLinkControllerBase
         CultureKeywordSet set,
         IReadOnlyList<KeywordMapping> allMappings)
     {
-        // The same precedence the registry resolves with, so the screen cannot disagree with the renderer about
-        // which row is in force for this language.
         Dictionary<string, KeywordMapping> mappings = KeywordMapping.InForce(allMappings, culture);
 
         List<KeywordRowResponseModel> rows = mappings.Values
@@ -129,8 +127,6 @@ public sealed class KeywordMappingController : AutoLinkControllerBase
 
         if (wantsExternal)
         {
-            // Validated here and again when the registry builds: an editor-supplied href is the one place this
-            // package could emit a hostile scheme.
             if (!ExternalUrl.TryNormalise(model.ExternalUrl, out string? url))
             {
                 return BadRequest("An external link must be an absolute http or https URL.");

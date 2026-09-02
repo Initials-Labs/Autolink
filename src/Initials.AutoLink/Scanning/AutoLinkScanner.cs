@@ -26,13 +26,6 @@ public interface IAutoLinkScanner
 }
 
 /// <inheritdoc />
-/// <remarks>
-/// Render-time linking records nothing, so the only honest way to answer "which pages have auto-links" is to run
-/// the linker again and ask. This does exactly that, in dry-run mode, against the published cache — which makes
-/// the report exact (same code, same rules, same conflicts) and complete (pages nobody has visited are included).
-/// What it deliberately is not is a history of what was served; that would need writing observations down as
-/// pages render.
-/// </remarks>
 internal sealed class AutoLinkScanner : IAutoLinkScanner
 {
     /// <summary>Depth guard for nested blocks. Deep enough for any real layout, shallow enough to stop a cycle.</summary>
@@ -91,8 +84,6 @@ internal sealed class AutoLinkScanner : IAutoLinkScanner
         var languageService = scope.ServiceProvider.GetRequiredService<ILanguageService>();
         var urlProvider = scope.ServiceProvider.GetRequiredService<IPublishedUrlProvider>();
 
-        // Needed for invariant pages: they carry no per-culture versions, but they are still served in every
-        // language, and the renderer will match them against the requested language's keywords.
         IReadOnlyList<string> siteCultures = (await languageService.GetAllAsync())
             .Select(language => language.IsoCode)
             .ToList();
@@ -104,9 +95,6 @@ internal sealed class AutoLinkScanner : IAutoLinkScanner
         {
             return new AutoLinkScanReport(snapshot.Stamp, 0, 0, [], []);
         }
-
-        // No short-circuit on an empty snapshot. Preview already bails per blob, and reporting "0 pages scanned"
-        // when the walk never happened reads as a broken scan rather than as an empty result.
 
         foreach (Guid key in EnumeratePublishedKeys(contentService))
         {
@@ -133,15 +121,11 @@ internal sealed class AutoLinkScanner : IAutoLinkScanner
 
             scanned++;
 
-            // A variant page is one node with a version per language, each with its own keywords, its own URL and
-            // its own copy. Every one of them is a separate row.
             foreach (string culture in CulturesOf(page, siteCultures))
             {
                 string? url = urlProvider.GetUrl(page, UrlMode.Relative, culture.Length == 0 ? null : culture);
                 if (string.IsNullOrWhiteSpace(url) || url == "#")
                 {
-                    // Unroutable in this culture: usually the variant is not published. Recorded rather than dropped,
-                    // because "my page is missing from the report" is otherwise unanswerable.
                     skippedPages.Add(new SkippedPage(
                         page.Key, page.Name, culture, AutoLinkScanSkipReason.Unroutable));
 
@@ -150,8 +134,6 @@ internal sealed class AutoLinkScanner : IAutoLinkScanner
 
                 var placements = new List<AutoLinkPlacement>();
 
-                // Every rich text property on the page shares one budget, exactly as a real request would, so the
-                // report honours MaxLinksPerKeyword and MaxLinksPerPage the same way the renderer does.
                 var state = new AutoLinkRequestState();
 
                 foreach (string markup in CollectMarkup(page, culture))
@@ -225,17 +207,10 @@ internal sealed class AutoLinkScanner : IAutoLinkScanner
     /// <summary>
     /// Every piece of rich text on a page, including the ones nested inside Block List and Block Grid.
     /// </summary>
-    /// <remarks>
-    /// Linking is switched off while the values are read. Reading a converted property value runs the value
-    /// converter, which is where linking happens — so without this the scan would both double-link and spend the
-    /// page budget before the preview ever ran.
-    /// </remarks>
     private IEnumerable<string> CollectMarkup(IPublishedContent page, string culture)
     {
         var markup = new List<string>();
 
-        // The variation context decides which culture a variant property value resolves to, including for rich text
-        // nested inside blocks, where there is no per-call culture argument to pass.
         VariationContext? previous = _variationContextAccessor.VariationContext;
 
         try
@@ -258,12 +233,6 @@ internal sealed class AutoLinkScanner : IAutoLinkScanner
     /// <summary>
     /// The cultures to examine a page in.
     /// </summary>
-    /// <remarks>
-    /// A varying page is examined in the cultures it is published in. An invariant page has none of its own, but it
-    /// is still served in every language, and the renderer picks keywords by the culture of the request — so it has
-    /// to be examined once per site language, not once against the invariant keyword set. Scanning it invariantly
-    /// was a real gap: a page whose doctype did not vary rendered en-GB links and appeared nowhere in the report.
-    /// </remarks>
     private static IReadOnlyList<string> CulturesOf(IPublishedContent page, IReadOnlyList<string> siteCultures)
     {
         List<string> cultures = page.Cultures.Keys.Where(culture => culture.Length > 0).ToList();
@@ -298,7 +267,6 @@ internal sealed class AutoLinkScanner : IAutoLinkScanner
             }
             catch (Exception ex)
             {
-                // One broken property must not abort the whole scan.
                 _logger.LogWarning(ex, "Could not read property {Alias} while scanning.", property.Alias);
                 continue;
             }

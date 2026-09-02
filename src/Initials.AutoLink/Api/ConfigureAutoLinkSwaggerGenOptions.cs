@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-// Microsoft.OpenApi 2.x, which 17.6.1 ships: OpenApiInfo is no longer under .Models.
 using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 

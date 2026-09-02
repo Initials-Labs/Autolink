@@ -53,8 +53,6 @@ public sealed class AutoLinkReportController : AutoLinkControllerBase
         }
         catch (Exception ex)
         {
-            // The report is the answer the caller asked for; the relations are bookkeeping on top of it. A failure
-            // here must not turn a good scan into a failed request.
             _logger.LogError(ex, "The scan succeeded but the auto-link relations could not be reconciled.");
         }
 

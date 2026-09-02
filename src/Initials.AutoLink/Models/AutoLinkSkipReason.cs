@@ -3,11 +3,6 @@ namespace Initials.AutoLink.Models;
 /// <summary>
 /// Why a mention of a registered keyword was not turned into a link.
 /// </summary>
-/// <remarks>
-/// Stable codes rather than sentences, so the screen can phrase them and they can be counted. Every one of these
-/// used to be a silent skip, which made the audit impossible to trust: a page could mention a keyword three times
-/// and appear once, with nothing saying why.
-/// </remarks>
 internal static class AutoLinkSkipReason
 {
     /// <summary>The mentioning page is the page the keyword points at.</summary>
