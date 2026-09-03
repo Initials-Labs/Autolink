@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check the version numbers agree
         run: |
@@ -26,7 +26,7 @@ jobs:
       - name: Check the Marketplace listing file against the schema
         run: pipx run check-jsonschema --regex-variant python --schemafile https://marketplace.umbraco.com/umbraco-marketplace-schema.json umbraco-marketplace.json
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
@@ -51,7 +51,7 @@ jobs:
           unzip -l artifacts/*.nupkg | grep -q 'README.md' || { echo 'The README is missing, so nuget.org has no landing page'; exit 1; }
           unzip -l artifacts/*.nupkg | grep -q 'AutolinkLogo.png' || { echo 'The icon is missing, so both listings fall back to a placeholder'; exit 1; }
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: nupkg
           path: artifacts/*.nupkg
