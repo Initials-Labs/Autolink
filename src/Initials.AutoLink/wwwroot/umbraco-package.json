@@ -1,14 +1,14 @@
 {
   "$schema": "../../umbraco-package-schema.json",
   "name": "Initials.AutoLink",
-  "version": "0.1.0-alpha003",
+  "version": "1.0.0-beta001",
   "allowTelemetry": true,
   "extensions": [
     {
       "type": "localization",
       "alias": "Initials.AutoLink.Localization.enus",
       "name": "Autolink English (en-us)",
-      "js": "/App_Plugins/Initials.AutoLink/lang/en.js?v=0.1.0-alpha003",
+      "js": "/App_Plugins/Initials.AutoLink/lang/en.js?v=1.0.0-beta001",
       "meta": {
         "culture": "en-us"
       }
@@ -17,7 +17,7 @@
       "type": "localization",
       "alias": "Initials.AutoLink.Localization.engb",
       "name": "Autolink English (en-gb)",
-      "js": "/App_Plugins/Initials.AutoLink/lang/en.js?v=0.1.0-alpha003",
+      "js": "/App_Plugins/Initials.AutoLink/lang/en.js?v=1.0.0-beta001",
       "meta": {
         "culture": "en-gb"
       }
@@ -26,7 +26,7 @@
       "type": "localization",
       "alias": "Initials.AutoLink.Localization.en",
       "name": "Autolink English (en)",
-      "js": "/App_Plugins/Initials.AutoLink/lang/en.js?v=0.1.0-alpha003",
+      "js": "/App_Plugins/Initials.AutoLink/lang/en.js?v=1.0.0-beta001",
       "meta": {
         "culture": "en"
       }
@@ -45,7 +45,7 @@
       "type": "dashboard",
       "alias": "Initials.AutoLink.Dashboard.Keywords",
       "name": "Autolink keywords dashboard",
-      "element": "/App_Plugins/Initials.AutoLink/autolink-keywords.js?v=0.1.0-alpha003",
+      "element": "/App_Plugins/Initials.AutoLink/autolink-keywords.js?v=1.0.0-beta001",
       "weight": 10,
       "meta": {
         "label": "#initialsAutoLink_dashboardName",
