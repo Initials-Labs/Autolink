@@ -34,15 +34,9 @@ internal static class KeywordMatcher
     }
 
     /// <summary>
-    /// Word boundaries are applied per keyword rather than around the whole alternation, because \b only does the
-    /// right thing next to a word character. Wrapping the group would stop "C#" ever matching.
+    /// A keyword must not have a word character on either side. Lookarounds rather than \b, because \b only means
+    /// "edge of a word" next to a word character: it would let ".NET" match inside "ASP.NET" and stop "C#" ever
+    /// matching at all.
     /// </summary>
-    private static string ToBoundedPattern(string keyword)
-    {
-        string escaped = Regex.Escape(keyword);
-        string left = char.IsLetterOrDigit(keyword[0]) ? @"\b" : string.Empty;
-        string right = char.IsLetterOrDigit(keyword[^1]) ? @"\b" : string.Empty;
-
-        return $"{left}{escaped}{right}";
-    }
+    private static string ToBoundedPattern(string keyword) => $@"(?<!\w){Regex.Escape(keyword)}(?!\w)";
 }

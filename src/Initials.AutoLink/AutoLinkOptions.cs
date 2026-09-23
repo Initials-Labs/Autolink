@@ -18,8 +18,8 @@ public sealed class AutoLinkOptions
     public string ExcludePropertyAlias { get; set; } = "excludeFromAutoLinking";
 
     /// <summary>
-    /// Default rel attribute for external auto-links. Empty omits it. Individual links can override this, for a
-    /// domain trusted enough to pass authority to.
+    /// Space-separated rel tokens every external auto-link carries. Empty omits the attribute. A keyword's own
+    /// nofollow setting adds or removes that one token and leaves the rest alone.
     /// </summary>
     public string ExternalLinkRel { get; set; } = "nofollow";
 
@@ -44,12 +44,9 @@ public sealed class AutoLinkOptions
     ];
 
     /// <summary>
-    /// Document type aliases the schema installer adds the scan opt-out property to. Empty disables the installer.
+    /// Document type aliases the schema installer adds the scan opt-out property to. Empty, the default, disables
+    /// the installer: a package does not add properties to document types nobody nominated.
     /// </summary>
-    /// <remarks>
-    /// Empty by default. Guessing alias names on somebody else's site was fine for a spike and wrong for a package:
-    /// installing a property onto document types nobody nominated is not a decision a package gets to make.
-    /// </remarks>
     public string[] InstallOnDocumentTypes { get; set; } = [];
 
     /// <summary>

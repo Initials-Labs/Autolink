@@ -54,7 +54,13 @@ internal sealed class KeywordRegistry : IKeywordRegistry
                     return _snapshot;
                 }
 
-                KeywordSnapshot rebuilt = Build();
+                KeywordSnapshot? rebuilt = Build();
+
+                if (rebuilt is null)
+                {
+                    _dirty = false;
+                    return _snapshot ?? KeywordSnapshot.Empty;
+                }
 
                 if (_snapshot is not null && string.Equals(_snapshot.Stamp, rebuilt.Stamp, StringComparison.Ordinal))
                 {
@@ -79,9 +85,10 @@ internal sealed class KeywordRegistry : IKeywordRegistry
     public void Invalidate() => _dirty = true;
 
     /// <summary>
-    /// Builds every culture's keyword set from the stored keyword rows.
+    /// Builds every culture's keyword set from the stored keyword rows. Null when the build failed, so the caller
+    /// can keep serving the last good snapshot.
     /// </summary>
-    private KeywordSnapshot Build()
+    private KeywordSnapshot? Build()
     {
         AutoLinkOptions options = _options.CurrentValue;
         var sets = new Dictionary<string, CultureKeywordSet>(StringComparer.OrdinalIgnoreCase);
@@ -118,8 +125,8 @@ internal sealed class KeywordRegistry : IKeywordRegistry
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to build the auto-link keyword registry. Rendering without auto-links.");
-            return KeywordSnapshot.Empty;
+            _logger.LogError(ex, "Failed to build the auto-link keyword registry. Keeping the previous keyword set until the next change.");
+            return null;
         }
 
         return new KeywordSnapshot(sets, ComputeStamp(sets));
@@ -213,7 +220,7 @@ internal sealed class KeywordRegistry : IKeywordRegistry
                     external,
                     mapping.Label is { Length: > 0 } label ? label : ExternalUrl.Describe(external),
                     KeywordSource.External,
-                    RelFor(mapping, options));
+                    RelFor(mapping.Nofollow, options.ExternalLinkRel));
             }
 
             _logger.LogWarning(
@@ -250,18 +257,25 @@ internal sealed class KeywordRegistry : IKeywordRegistry
     }
 
     /// <summary>
-    /// The rel attribute for an external link: the row's own choice, or the configured default.
+    /// The rel attribute for an external link: the configured tokens, with the row's nofollow choice adding or
+    /// removing that one token. Null when nothing is left.
     /// </summary>
-    private static string? RelFor(KeywordMapping mapping, AutoLinkOptions options)
+    internal static string? RelFor(bool? nofollow, string configuredRel)
     {
-        bool nofollow = mapping.Nofollow ?? options.ExternalLinkRel.Contains("nofollow", StringComparison.OrdinalIgnoreCase);
+        var tokens = new List<string>(
+            configuredRel.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 
-        if (!nofollow)
+        if (nofollow is { } choice)
         {
-            return null;
+            tokens.RemoveAll(token => string.Equals(token, "nofollow", StringComparison.OrdinalIgnoreCase));
+
+            if (choice)
+            {
+                tokens.Insert(0, "nofollow");
+            }
         }
 
-        return options.ExternalLinkRel.Length > 0 ? options.ExternalLinkRel : "nofollow";
+        return tokens.Count == 0 ? null : string.Join(' ', tokens);
     }
 
     private static bool IsRoutable(string? url) => !string.IsNullOrWhiteSpace(url) && url != "#";
@@ -271,7 +285,7 @@ internal sealed class KeywordRegistry : IKeywordRegistry
     /// would actually differ, so a typo fix in body copy on a target page does not move the stamp, while a keyword
     /// added in one language does.
     /// </summary>
-    private static string ComputeStamp(Dictionary<string, CultureKeywordSet> sets)
+    internal static string ComputeStamp(IReadOnlyDictionary<string, CultureKeywordSet> sets)
     {
         var builder = new StringBuilder();
 
