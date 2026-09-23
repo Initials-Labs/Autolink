@@ -20,9 +20,7 @@ namespace Initials.AutoLink.Models;
 /// Culture of the suppression row in force, empty when it applies to every culture, null when not suppressed.
 /// </param>
 /// <remarks>
-/// The suppression is identified by the row actually in force rather than by flags describing it. Flags were the
-/// first design and they were wrong: computed per keyword, so a keyword with an all-languages row on one page
-/// reported every other page as all-languages too, and lifting it tried to delete a row that never existed.
+/// The suppression is identified by the row actually in force, so lifting it deletes a row that exists.
 /// </remarks>
 public sealed record AutoLinkPlacement(
     string Keyword,

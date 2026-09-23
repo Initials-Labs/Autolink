@@ -41,9 +41,8 @@ public sealed class CultureKeywordSet
     /// Keyword to the suppression rows applying to it in this culture.
     /// </summary>
     /// <remarks>
-    /// One structure rather than three. This began as a set of globally suppressed keywords, a page-to-keywords
-    /// lookup, and the rows themselves: the same data three ways, and three things to keep in step. The rows answer
-    /// both questions on their own — whether something is held back, and which row to lift to release it.
+    /// The rows answer both questions on their own: whether something is held back, and which row to lift to
+    /// release it.
     /// </remarks>
     public IReadOnlyDictionary<string, IReadOnlyList<KeywordSuppression>> Suppressions { get; }
 

@@ -10,20 +10,11 @@ namespace Initials.AutoLink.Api.Controllers;
 /// Teardown, for removing the package cleanly.
 /// </summary>
 /// <remarks>
-/// Deliberately not surfaced as a button in the dashboard. It destroys every keyword on the site, and a destructive
-/// action one click away from the screen editors use every day is a mistake waiting to happen. It is an explicit
-/// call for whoever is removing the package.
+/// Deliberately not surfaced as a button in the dashboard. It destroys every keyword on the site, and there is
+/// nowhere else they are stored, so it is an explicit call for whoever is removing the package.
 /// <para>
-/// The blast radius grew when keywords stopped living on document types. These tables used to hold decisions
-/// layered over tags, so a teardown lost the decisions and left the keywords themselves in the content. They are
-/// now the only place keywords exist, so this drops the lot.
-/// </para>
-/// <para>
-/// It also asks for more than the section: everything else here is gated on access to the Autolink section, which
-/// is the permission an editor settling keyword collisions holds. Dropping both tables is not that permission, so this
-/// one endpoint additionally requires an administrator. Both policies apply, so the administrator doing the teardown
-/// needs the section granted as well — the same tick that let them use the dashboard in the first place. The
-/// confirmation token below stops a mistake; it was never authorization.
+/// Both policies apply: the caller needs the Autolink section granted, as every endpoint does, and must also be an
+/// administrator. The confirmation token stops a mistake; it is not authorization.
 /// </para>
 /// </remarks>
 [Authorize(Policy = AutoLinkApiConfiguration.TeardownPolicyName)]
