@@ -60,18 +60,6 @@ public sealed class AutoLinkReportController : AutoLinkControllerBase
     }
 
     /// <summary>
-    /// Rebuilds the relations without the caller needing the report, for a scheduled job or a console command.
-    /// </summary>
-    [HttpPost("relations")]
-    [ProducesResponseType(typeof(AutoLinkRelationChanges), StatusCodes.Status200OK)]
-    public async Task<IActionResult> Relations(CancellationToken cancellationToken)
-    {
-        AutoLinkScanReport report = await _scanner.ScanAsync(cancellationToken);
-
-        return Ok(_relations.Reconcile(report));
-    }
-
-    /// <summary>
     /// Stops a keyword being linked, on one page or everywhere.
     /// </summary>
     [HttpPut("suppression")]

@@ -306,14 +306,6 @@ internal sealed class AutoLinkScanner : IAutoLinkScanner
                 }
 
                 return;
-
-            case IEnumerable<IPublishedElement> elements:
-                foreach (IPublishedElement child in elements)
-                {
-                    CollectFromElement(child, markup, depth + 1);
-                }
-
-                return;
         }
     }
 
