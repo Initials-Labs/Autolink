@@ -2,6 +2,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
+using NSubstitute.ExceptionExtensions;
+using NSubstitute.Extensions;
 using Initials.AutoLink.Persistence;
 using Initials.AutoLink.Registry;
 using Umbraco.Cms.Core.Models;
@@ -23,6 +25,7 @@ public class RegistryTests
     private const string Url = "https://initials.co.uk";
 
     private readonly IKeywordMappingStore _mappings = Substitute.For<IKeywordMappingStore>();
+    private readonly ManualTime _time = new();
     private readonly KeywordRegistry _registry;
 
     public RegistryTests()
@@ -48,11 +51,12 @@ public class RegistryTests
         _registry = new KeywordRegistry(
             services.GetRequiredService<IServiceScopeFactory>(),
             options,
-            NullLogger<KeywordRegistry>.Instance);
+            NullLogger<KeywordRegistry>.Instance,
+            _time);
     }
 
     private void Stored(string? label = null, bool? nofollow = null) =>
-        _mappings.GetAll().Returns([new KeywordMapping(Keyword, Guid.Empty, Url, label, nofollow, DateTime.UtcNow, "test", "")]);
+        _mappings.Configure().GetAll().Returns([new KeywordMapping(Keyword, Guid.Empty, Url, label, nofollow, DateTime.UtcNow, "test", "")]);
 
     private Models.KeywordTarget Target() => _registry.Current.For(null).Targets[Keyword];
 
@@ -89,5 +93,50 @@ public class RegistryTests
         _registry.Invalidate();
 
         Assert.Equal(before, _registry.Current.Stamp);
+    }
+
+    [Fact]
+    public void A_failed_rebuild_keeps_the_last_good_keywords()
+    {
+        Stored();
+        Assert.True(_registry.Current.For(null).Targets.ContainsKey(Keyword));
+
+        _mappings.GetAll().Throws(new InvalidOperationException("database unavailable"));
+        _registry.Invalidate();
+
+        Assert.True(_registry.Current.For(null).Targets.ContainsKey(Keyword));
+    }
+
+    [Fact]
+    public void A_failed_rebuild_waits_before_trying_again()
+    {
+        _mappings.GetAll().Throws(new InvalidOperationException("database unavailable"));
+
+        _ = _registry.Current;
+        _ = _registry.Current;
+        _ = _registry.Current;
+
+        _mappings.Received(1).GetAll();
+    }
+
+    [Fact]
+    public void A_failed_rebuild_recovers_once_the_wait_is_over()
+    {
+        _mappings.GetAll().Throws(new InvalidOperationException("database unavailable"));
+        Assert.True(_registry.Current.IsEmpty);
+
+        Stored();
+        _time.Advance(TimeSpan.FromMinutes(1));
+
+        Assert.True(_registry.Current.For(null).Targets.ContainsKey(Keyword));
+    }
+
+    private sealed class ManualTime : TimeProvider
+    {
+        private DateTimeOffset _now = new(2026, 9, 24, 0, 0, 0, TimeSpan.Zero);
+
+        public override DateTimeOffset GetUtcNow() => _now;
+
+        public void Advance(TimeSpan by) => _now += by;
     }
 }

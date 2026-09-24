@@ -29,29 +29,39 @@ internal sealed class KeywordMappingStore : IKeywordMappingStore
     {
         try
         {
-            using IScope scope = _scopeProvider.CreateScope(autoComplete: true);
-
-            Sql<ISqlContext> sql = scope.SqlContext.Sql()
-                .Select<KeywordMappingDto>()
-                .From<KeywordMappingDto>();
-
-            return scope.Database.Fetch<KeywordMappingDto>(sql)
-                .Select(dto => new KeywordMapping(
-                    dto.Keyword,
-                    dto.TargetKey,
-                    dto.ExternalUrl,
-                    dto.Label,
-                    dto.Nofollow,
-                    dto.UpdateDate,
-                    dto.UpdatedBy,
-                    dto.Culture ?? string.Empty))
-                .ToList();
+            return Read();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Could not read the auto-link keywords. Nothing will be auto-linked.");
+            if (!MissingTable.Is(_scopeProvider, KeywordMappingDto.TableName))
+            {
+                throw;
+            }
+
+            _logger.LogWarning(ex, "The auto-link keyword table does not exist yet. Nothing will be auto-linked.");
             return [];
         }
+    }
+
+    private List<KeywordMapping> Read()
+    {
+        using IScope scope = _scopeProvider.CreateScope(autoComplete: true);
+
+        Sql<ISqlContext> sql = scope.SqlContext.Sql()
+            .Select<KeywordMappingDto>()
+            .From<KeywordMappingDto>();
+
+        return scope.Database.Fetch<KeywordMappingDto>(sql)
+            .Select(dto => new KeywordMapping(
+                dto.Keyword,
+                dto.TargetKey,
+                dto.ExternalUrl,
+                dto.Label,
+                dto.Nofollow,
+                dto.UpdateDate,
+                dto.UpdatedBy,
+                dto.Culture ?? string.Empty))
+            .ToList();
     }
 
     /// <inheritdoc />

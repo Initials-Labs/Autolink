@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Initials.AutoLink.Api;
 using Initials.AutoLink.Caching;
 using Initials.AutoLink.Api.Security;
@@ -37,6 +38,7 @@ public sealed class AutoLinkComposer : IComposer
         builder.Services.AddSingleton<IAutoLinkScanner, AutoLinkScanner>();
         builder.Services.AddSingleton<IAutoLinkRelationWriter, AutoLinkRelationWriter>();
         builder.Services.AddSingleton<IAutoLinkUninstaller, AutoLinkUninstaller>();
+        builder.Services.TryAddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<IKeywordRegistry, KeywordRegistry>();
         builder.Services.AddSingleton<IAutoLinker, AutoLinker>();
 

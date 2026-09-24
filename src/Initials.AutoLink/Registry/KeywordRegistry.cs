@@ -21,19 +21,25 @@ internal sealed class KeywordRegistry : IKeywordRegistry
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IOptionsMonitor<AutoLinkOptions> _options;
     private readonly ILogger<KeywordRegistry> _logger;
+    private readonly TimeProvider _time;
+
+    private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(30);
 
     private readonly Lock _lock = new();
     private KeywordSnapshot? _snapshot;
     private volatile bool _dirty = true;
+    private DateTimeOffset _retryAfter = DateTimeOffset.MinValue;
 
     public KeywordRegistry(
         IServiceScopeFactory scopeFactory,
         IOptionsMonitor<AutoLinkOptions> options,
-        ILogger<KeywordRegistry> logger)
+        ILogger<KeywordRegistry> logger,
+        TimeProvider time)
     {
         _scopeFactory = scopeFactory;
         _options = options;
         _logger = logger;
+        _time = time;
     }
 
     /// <inheritdoc />
@@ -54,11 +60,16 @@ internal sealed class KeywordRegistry : IKeywordRegistry
                     return _snapshot;
                 }
 
+                if (_time.GetUtcNow() < _retryAfter)
+                {
+                    return _snapshot ?? KeywordSnapshot.Empty;
+                }
+
                 KeywordSnapshot? rebuilt = Build();
 
                 if (rebuilt is null)
                 {
-                    _dirty = false;
+                    _retryAfter = _time.GetUtcNow() + RetryDelay;
                     return _snapshot ?? KeywordSnapshot.Empty;
                 }
 
@@ -82,8 +93,7 @@ internal sealed class KeywordRegistry : IKeywordRegistry
     public void Invalidate() => _dirty = true;
 
     /// <summary>
-    /// Builds every culture's keyword set from the stored keyword rows. Null when the build failed, so the caller
-    /// can keep serving the last good snapshot.
+    /// Builds every culture's keyword set from the stored keyword rows, or null when that fails.
     /// </summary>
     private KeywordSnapshot? Build()
     {
@@ -122,7 +132,10 @@ internal sealed class KeywordRegistry : IKeywordRegistry
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to build the auto-link keyword registry. Keeping the previous keyword set until the next change.");
+            _logger.LogError(
+                ex,
+                "Failed to build the auto-link keyword registry. Keeping the last keyword set and retrying in {Delay}.",
+                RetryDelay);
             return null;
         }
 

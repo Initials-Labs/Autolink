@@ -36,7 +36,10 @@ public sealed record KeywordSuppression(
 /// </summary>
 public interface IKeywordSuppressionStore
 {
-    /// <summary>Every suppression. Read once per registry rebuild, not per render.</summary>
+    /// <summary>
+    /// Every suppression. Read once per registry rebuild, not per render. Empty before the table exists; throws if
+    /// it exists and cannot be read.
+    /// </summary>
     IReadOnlyList<KeywordSuppression> GetAll();
 
     /// <summary>Suppresses a keyword on one page, or everywhere with <see cref="KeywordSuppression.Everywhere"/>.</summary>
@@ -68,22 +71,32 @@ internal sealed class KeywordSuppressionStore : IKeywordSuppressionStore
     {
         try
         {
-            using IScope scope = _scopeProvider.CreateScope(autoComplete: true);
-
-            Sql<ISqlContext> sql = scope.SqlContext.Sql()
-                .Select<KeywordSuppressionDto>()
-                .From<KeywordSuppressionDto>();
-
-            return scope.Database.Fetch<KeywordSuppressionDto>(sql)
-                .Select(dto => new KeywordSuppression(
-                    dto.Keyword, dto.PageKey, dto.CreateDate, dto.CreatedBy, dto.Culture ?? string.Empty))
-                .ToList();
+            return Read();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Could not read auto-link suppressions. Nothing will be suppressed.");
+            if (!MissingTable.Is(_scopeProvider, KeywordSuppressionDto.TableName))
+            {
+                throw;
+            }
+
+            _logger.LogWarning(ex, "The auto-link suppression table does not exist yet. Nothing will be suppressed.");
             return [];
         }
+    }
+
+    private List<KeywordSuppression> Read()
+    {
+        using IScope scope = _scopeProvider.CreateScope(autoComplete: true);
+
+        Sql<ISqlContext> sql = scope.SqlContext.Sql()
+            .Select<KeywordSuppressionDto>()
+            .From<KeywordSuppressionDto>();
+
+        return scope.Database.Fetch<KeywordSuppressionDto>(sql)
+            .Select(dto => new KeywordSuppression(
+                dto.Keyword, dto.PageKey, dto.CreateDate, dto.CreatedBy, dto.Culture ?? string.Empty))
+            .ToList();
     }
 
     /// <inheritdoc />

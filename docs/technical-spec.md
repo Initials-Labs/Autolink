@@ -259,8 +259,11 @@ copy on a target page leaves it where it was. Every rebuild swaps in its new sna
 stamp only decides whether the rebuild is logged. It does not cover `rel` values or link titles, so
 it must not be used to decide whether rendered output is stale.
 
-A failed rebuild is caught and returns `KeywordSnapshot.Empty`, rendering unlinked rather than
-taking the site down.
+A failed rebuild is caught and the last good snapshot keeps being served (`KeywordSnapshot.Empty`
+if there never was one). The registry stays dirty and retries no sooner than 30 seconds later, so
+an outage does not put a database call on every render. The stores throw on any read failure
+other than a missing table, so a failure reaches the registry as one rather than as an empty
+keyword set.
 
 ---
 

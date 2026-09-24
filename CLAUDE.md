@@ -456,10 +456,11 @@ in the same commit.
   `IServiceScope` per rebuild. Blocking on the async `ILanguageService` is fine there: rebuilds happen on keyword
   changes, not per render, and there is no synchronisation context to deadlock against.
 - One `IContentService.GetByIds` fetches every target page, shared across cultures; `GetCultureName` returns
-  null for a non-varying page, hence the `Name` fallback. A failed rebuild logs and keeps the last good snapshot,
-  marked clean — a transient database error must not downgrade a working site to unlinked, and retrying on every
-  render would hammer a database that is already failing. The first build failing serves the empty snapshot.
-  Either way the registry stays put until the next invalidation, so a failure is not self-healing.
+  null for a non-varying page, hence the `Name` fallback. A failed rebuild logs, keeps serving the last good
+  snapshot (empty only if there never was one) and stays dirty, retrying no sooner than 30 seconds later. It
+  used to swap in the empty snapshot and mark itself clean, so one database blip unlinked the whole site until
+  the next publish. The delay is there because rebuilds happen under a lock on the render path, and retrying on
+  every render during an outage would queue every page behind a database timeout.
 - `RelFor` is one rule: the configured `ExternalLinkRel` tokens go on every external link, and a row's `Nofollow`
   adds or removes that single token. The first version only applied the configured string when it contained
   "nofollow", so configuring `noopener` alone produced no `rel` at all.
@@ -471,9 +472,12 @@ in the same commit.
 
 ### Persistence
 
-- A missing table (migration not yet run) degrades instead of throwing: the mapping store returns no keywords
-  (site behaves as if the package were absent), the suppression store returns none (a link that should be
-  suppressed is visible and fixable). Both are survivable in a way a failed request is not.
+- A missing table (migration not yet run, or torn down) degrades instead of throwing: the mapping store returns
+  no keywords (site behaves as if the package were absent), the suppression store returns none (a link that
+  should be suppressed is visible and fixable). Both are survivable in a way a failed request is not. **Only**
+  a missing table: any other read failure throws, and the table check runs only after a read fails, so the
+  happy path costs nothing. Swallowing every error used to hand the registry an empty set it could not tell
+  from a real one. Every caller of `GetAll` other than the registry already catches.
 - The stores invalidate the registry themselves — they are the code that knows rows changed, and an invalidation
   nobody sends leaves other servers resolving the old way until the next content change.
 - `keywordKey` is stored lower-cased next to the display-cased `keyword` because SQLite text comparison is
