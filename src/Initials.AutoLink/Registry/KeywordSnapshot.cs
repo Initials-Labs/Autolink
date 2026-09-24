@@ -34,8 +34,8 @@ public sealed class KeywordSnapshot
     /// The set to use for a request, falling back to the invariant one.
     /// </summary>
     /// <remarks>
-    /// The fallback matters both ways round. A site whose keyword property does not vary has everything in the
-    /// invariant set, and a request with no culture on a site that does vary would otherwise get nothing.
+    /// The fallback matters both ways round. A site with no languages configured has everything in the invariant
+    /// set, and a request with no culture on a multilingual site would otherwise get nothing.
     /// </remarks>
     public CultureKeywordSet For(string? culture)
     {

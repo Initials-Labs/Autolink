@@ -19,7 +19,7 @@
     <Title>Initials.AutoLink for Umbraco</Title>
     <Description>Turns keyword mentions in Umbraco rich text and markdown into links to the corresponding page or external link, at render time, with no editor action required. Stored markup is never modified, so an article picks up a link the day somebody adds the keyword. Keywords live in a backoffice section of their own rather than on your document types, and point at a page or an external URL through Umbraco's Multi URL Picker. Shows which pages carry links and lets individual ones be switched off. Multilingual.</Description>
     <PackageTags>umbraco;umbraco-marketplace;seo;internal-linking;rich-text</PackageTags>
-    <PackageReleaseNotes>Second alpha. Autolink now covers Markdown editor properties, the keywords screen links page names to the backoffice editor beside the front-end URL, and the relation type migration no longer fails the plan when another relation type already carries its name. Built and verified against Umbraco 17.6.1 on .NET 10.</PackageReleaseNotes>
+    <PackageReleaseNotes>First stable release. Render-time auto-linking for rich text and Markdown properties, keywords managed in their own backoffice section with page or external destinations, per-culture keyword sets, a dry-run audit with per-page and site-wide suppression, and dependency relations so Umbraco warns before a link target is deleted. Built and verified against Umbraco 17.6.1 on .NET 10.</PackageReleaseNotes>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/Initials-Labs/Autolink</RepositoryUrl>
     <RepositoryType>git</RepositoryType>

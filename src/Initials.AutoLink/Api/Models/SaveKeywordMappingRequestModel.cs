@@ -22,7 +22,7 @@ public sealed class SaveKeywordMappingRequestModel
     /// <summary>Label for an external link, used as the anchor title. Defaults to the host.</summary>
     public string? Label { get; init; }
 
-    /// <summary>Overrides the configured rel default for this link. Null follows the configuration.</summary>
+    /// <summary>Adds or removes the nofollow token from the configured rel for this link. Null leaves it as configured.</summary>
     public bool? Nofollow { get; init; }
 
     /// <summary>

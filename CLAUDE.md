@@ -195,7 +195,7 @@ nobody outside could construct.
 **Compiling clean proves nothing here, so it was checked on a running site.** Umbraco finds migrations, the cache
 refresher and the property value converter by reflection and DI, and every one of those failures is silent. Verified
 on the Clean site: both migration plans ran from the log, `data-autolink` anchors rendered on three pages including
-an external one, the six endpoints appeared in `/umbraco/swagger` and returned 401 rather than 500. Re-check the
+an external one, the five endpoints appeared in `/umbraco/swagger` and returned 401 rather than 500. Re-check the
 same four things if the accessibility of anything registered in the composer changes.
 
 Only `AutoLinkComposer` still relies on being publicly scanned. Do not make it internal.
@@ -434,8 +434,10 @@ in the same commit.
   `data-autolink`, so anything keying on the first keeps working. Outside a request (background render, unit
   test) the budget applies per call.
 - `Preview` throws away the rewritten markup; only the reported placements matter.
-- `KeywordMatcher` is its own type so longest-first and per-keyword word boundaries are tested directly, and so
-  the registry and the tests cannot disagree about what is matchable. Suppressed keywords stay in the automaton
+- `KeywordMatcher` is its own type so longest-first and the boundary rule are tested directly, and so the registry
+  and the tests cannot disagree about what is matchable. The boundary is a lookaround pair, not `\b`: the first
+  version only applied `\b` where the keyword started or ended in a word character, which let `.NET` match inside
+  `ASP.NET`. Suppressed keywords stay in the automaton
   and reserve their span (decision 5); an unresolved keyword is absent and reserves nothing.
 - "First occurrence per page" state (`AutoLinkRequestState`) also tallies skip *reports* separately per reason,
   capped, so five mentions produce one row per reason instead of five identical ones.
@@ -448,8 +450,13 @@ in the same commit.
   `IServiceScope` per rebuild. Blocking on the async `ILanguageService` is fine there: rebuilds happen on keyword
   changes, not per render, and there is no synchronisation context to deadlock against.
 - One `IContentService.GetByIds` fetches every target page, shared across cultures; `GetCultureName` returns
-  null for a non-varying page, hence the `Name` fallback. A failed rebuild logs and returns the empty snapshot —
-  render unlinked rather than take the site down.
+  null for a non-varying page, hence the `Name` fallback. A failed rebuild logs and keeps the last good snapshot,
+  marked clean — a transient database error must not downgrade a working site to unlinked, and retrying on every
+  render would hammer a database that is already failing. The first build failing serves the empty snapshot.
+  Either way the registry stays put until the next invalidation, so a failure is not self-healing.
+- `RelFor` is one rule: the configured `ExternalLinkRel` tokens go on every external link, and a row's `Nofollow`
+  adds or removes that single token. The first version only applied the configured string when it contained
+  "nofollow", so configuring `noopener` alone produced no `rel` at all.
 - Invalidation is hooked to `ContentCacheRefresherNotification`, **not** `ContentPublished`: published fires
   inside the publish before the cache settles (a render at that moment could rebuild stale and mark itself
   clean), and it only fires on the publishing server — the refresher runs on every node via the distributed
@@ -534,10 +541,19 @@ in the same commit.
   are validated at save *and* at registry build (decision 7): the first editor-typed string in an href is an XSS
   boundary. Keyword max length matches the column so an over-long keyword is a 400, not a database error.
 - The scan endpoint treats relation reconciliation as bookkeeping: its failure must not turn a good scan into a
-  failed request. Mutation endpoints are idempotent. Swagger config: 17.6.1 ships Microsoft.OpenApi 2.x, where
+  failed request. A separate `POST /relations` endpoint existed for a scheduled job nobody wrote; it was removed
+  rather than carried. Mutation endpoints are idempotent. Swagger config: 17.6.1 ships Microsoft.OpenApi 2.x, where
   `OpenApiInfo` is no longer under `.Models`.
 - Skip reasons are stable codes, not sentences, so the screen can phrase and count them; every one used to be a
   silent skip, which made the audit impossible to trust.
+- `AutoLinkPlacement` names the suppression row in force rather than carrying flags describing it. Flags were the
+  first design and they were wrong: computed per keyword, so a keyword with an all-languages row on one page
+  reported every other page as all-languages too, and lifting it tried to delete a row that never existed.
+- `CultureKeywordSet.Suppressions` is one structure. It began as a global set, a page-to-keywords lookup and the
+  rows themselves: the same data three ways and three things to keep in step.
+- Public XML docs ship as IntelliSense, so they describe behaviour only. The design history that used to sit in
+  `<remarks>` on public types (the conflict count the unresolved badge replaced, the teardown's blast radius
+  growing when tags went) lives in the decisions above instead.
 
 ### Telemetry
 

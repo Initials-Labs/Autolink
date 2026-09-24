@@ -26,13 +26,9 @@ public sealed class CultureOverviewResponseModel
     public required int Total { get; init; }
 
     /// <summary>
-    /// Keywords whose destination will not resolve here.
+    /// Keywords whose destination will not resolve here: a page that has been deleted, unpublished, or never
+    /// published in this language. The count worth a badge.
     /// </summary>
-    /// <remarks>
-    /// The count worth a badge. It replaces what used to be the conflict count: two pages can no longer claim the
-    /// same phrase, so the thing that now needs somebody's attention is a keyword pointing at a page that has been
-    /// deleted, unpublished, or never published in this language.
-    /// </remarks>
     public required int Unresolved { get; init; }
 
     /// <summary>Keywords pointing somewhere outside the site.</summary>

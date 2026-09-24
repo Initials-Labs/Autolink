@@ -270,7 +270,7 @@ internal sealed class AutoLinker : IAutoLinker
                 continue;
             }
 
-            placements?.Add(ToPlacement(target, match.Value, suppressedPageKey: null, suppressedCulture: null));
+            placements?.Add(ToPlacement(target, match.Value));
 
             if (match.Index > cursor)
             {
@@ -353,19 +353,15 @@ internal sealed class AutoLinker : IAutoLinker
         state.RecordReport(target.Keyword, reason);
     }
 
-    private static AutoLinkPlacement ToPlacement(
-        KeywordTarget target,
-        string matchedText,
-        Guid? suppressedPageKey,
-        string? suppressedCulture) =>
+    private static AutoLinkPlacement ToPlacement(KeywordTarget target, string matchedText) =>
         new(
             target.Keyword,
             matchedText,
             target.TargetKey,
             target.TargetName,
             target.Url,
-            suppressedPageKey,
-            suppressedCulture,
+            SuppressedPageKey: null,
+            SuppressedCulture: null,
             SkipReason: null);
 
     /// <summary>

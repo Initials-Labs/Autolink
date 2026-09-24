@@ -239,8 +239,9 @@ cache is async-only in v17.
 
 - Sorted **longest first**, so `Claude AI Sonnet` beats `Claude` where both start at the same
   position.
-- Word boundaries applied **per keyword**, not around the group, because `\b` only behaves next to
-  a word character. Wrapping the group would stop `C#` ever matching.
+- Each keyword is wrapped in `(?<!\w)` and `(?!\w)` rather than `\b`: no word character on either
+  side. `\b` only means "edge of a word" next to a word character, so it would let `.NET` match inside
+  `ASP.NET` and stop `C#` ever matching.
 - `IgnoreCase | Compiled | CultureInvariant`.
 
 Built from resolved keywords only. Suppressed keywords resolve, so they are in the matcher and
@@ -358,8 +359,8 @@ Narrowest first so lifting makes visible progress. A keyword switched off both o
 everywhere stays suppressed after the page row goes, which is the truth rather than an action that
 appears to do nothing.
 
-**`rel` for an external link** (`KeywordRegistry.RelFor`): the row's `nofollow` if set, otherwise
-whether `ExternalLinkRel` contains `nofollow`. Result is `ExternalLinkRel` or `"nofollow"`.
+**`rel` for an external link** (`KeywordRegistry.RelFor`): the tokens in `ExternalLinkRel`, with the row's
+`nofollow` adding or removing that one token when it is set. Nothing left means no attribute.
 
 ### 6.4 Cross-provider constraints
 
@@ -464,7 +465,7 @@ corrected.
 Guid to int goes through `IIdKeyMap.GetIdForKey`, memoised per reconcile since the same pages recur
 across cultures.
 
-Triggered from `GET /scan` (which the dashboard calls on load) and from `POST /relations`. A read
+Triggered from `GET /scan`, which the dashboard calls on load. A read
 with a write behind it is not lovely; the trade is that the scan is the only thing that knows the
 answer and already walks every published page, and stale relations mean a delete warning that lies.
 
@@ -570,7 +571,6 @@ All under `/umbraco/management/api/v1/autolink`, versioned, with their own Swagg
 | PUT | `/mapping` | Create a keyword or repoint one |
 | DELETE | `/mapping?keyword=&culture=` | Remove a keyword |
 | GET | `/scan` | Dry-run report, and reconciles relations |
-| POST | `/relations` | Reconcile relations explicitly |
 | PUT | `/suppression` | Switch a keyword off |
 | DELETE | `/suppression?keyword=&pageKey=&culture=` | Switch it back on |
 | DELETE | `/data?confirm=remove-autolink-data` | Teardown, admin only |
@@ -662,7 +662,7 @@ Bound from `Initials:AutoLink` through `IOptionsMonitor`, so edits apply without
 |---|---|---|
 | `Enabled` | `true` | False delegates straight through to Umbraco's converter |
 | `ExcludePropertyAlias` | `excludeFromAutoLinking` | Boolean opting a page out of being *scanned*; it can still be a target |
-| `ExternalLinkRel` | `nofollow` | Empty omits it. Per-row override available |
+| `ExternalLinkRel` | `nofollow` | Space-separated tokens on every external link. Empty omits it. A row's nofollow adds or removes that token |
 | `MaxLinksPerKeyword` | `1` | SEO caution: the first mention is the useful one |
 | `MaxLinksPerPage` | `25` | Counted across every rich text property in the request |
 | `SkipInsideElements` | `a, code, pre, kbd, samp, script, style, textarea, button, select, option, h1-h6` | |
