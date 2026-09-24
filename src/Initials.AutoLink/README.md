@@ -30,7 +30,7 @@ Then three things, in order:
 1. **Grant the section.** Users → User Groups → your group → Sections → **Autolink**. A new section is granted
    to nobody by default, administrators included, so until you do this the screen is not reachable and the package
    looks like it did not install.
-2. **Add a keyword.** Autolink → Keywords → add the phrase, and pick where it goes with the Multi URL Picker —
+2. **Add a keyword.** Autolink → Keywords → add the phrase, and pick where it goes with Umbraco's link picker —
    a page, or an address outside the site.
 3. **Reload a page that mentions it.** That is the whole setup. Nothing is added to your document types, there is
    nothing for an editor to fill in per page, and no page needs republishing.
@@ -50,8 +50,10 @@ to a guess.
 <a href="/blog/claude-ai/" data-autolink="true">Claude AI</a>
 ```
 
-External destinations get `data-autolink-external="true"` and `rel="nofollow"` by default. Everything is marked, so
-auto-links can be audited, styled, or stripped wholesale later.
+External destinations get `data-autolink-external="true"` and `rel="nofollow"` by default. Each external keyword
+can switch nofollow off, or open in a new window (`target="_blank"`, with `noopener` added to the rel). Links into
+the site always open in the same window. Everything is marked, so auto-links can be audited, styled, or stripped
+wholesale later.
 
 The rules it follows, none of which are configurable per keyword:
 

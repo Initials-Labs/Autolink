@@ -7,7 +7,7 @@ Write "we tested this with Claude AI last week" in an RTE. If the keyword `Claud
 renders as a link to it. Write it *before* that page exists, and the link appears the day somebody adds the keyword —
 no republishing, no backfill, because stored markup is never touched.
 
-Keywords are managed in one place, a custom **Auto-linking** section, using Umbraco's Multi URL Picker to send each
+Keywords are managed in one place, a custom **Auto-linking** section, using Umbraco's link picker to send each
 one at a page or at an address outside the site. Nothing is added to your document types and there is nothing for an
 editor to fill in per page.
 
