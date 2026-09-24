@@ -11,8 +11,7 @@ public interface IKeywordRegistry
     KeywordSnapshot Current { get; }
 
     /// <summary>
-    /// Marks the registry stale. The next read rebuilds; if the rebuilt content hash matches the existing
-    /// one the old snapshot is kept, so the stamp does not move and downstream caches survive.
+    /// Marks the registry stale. The next read rebuilds.
     /// </summary>
     void Invalidate();
 }

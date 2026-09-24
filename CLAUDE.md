@@ -232,6 +232,12 @@ doctype. Most target-page edits don't touch keywords or URLs, and a typo fix in 
 copy shouldn't nuke site-wide cached output. Build dictionary → hash keyword set +
 resolved URLs → only bump if different.
 
+**Built differently.** The stamp-keyed cache it was meant to protect was measured as unnecessary and never
+built, so the registry always swaps in the rebuilt snapshot and the stamp is only an identifier on the report and
+overview. Keeping the old snapshot on an equal hash was tried and was a bug: the hash leaves out `rel` and link
+titles, so a nofollow toggle, a label change or a target rename never reached the page. If that cache is ever
+built, key it on a hash of everything the anchor carries, not this one.
+
 Hooked from `ContentCacheRefresherNotification`, not from the publish/unpublish/delete notifications the original
 design named — the field notes below have the two production reasons (cache settling, and other servers).
 
@@ -444,8 +450,8 @@ in the same commit.
 
 ### Registry and invalidation
 
-- The rebuilt snapshot is only swapped in when its content hash differs, so re-saving the same destination or
-  publishing an unrelated edit on a target page holds the stamp still and invalidates nothing downstream.
+- Every rebuild swaps in its snapshot; the stamp decides only whether the rebuild is logged, so a publish that
+  changes nothing about the keywords does not add a log line.
 - The singleton registry resolves scoped services (stores, `IUmbracoContextFactory`, URL provider) from a fresh
   `IServiceScope` per rebuild. Blocking on the async `ILanguageService` is fine there: rebuilds happen on keyword
   changes, not per render, and there is no synchronisation context to deadlock against.

@@ -62,17 +62,14 @@ internal sealed class KeywordRegistry : IKeywordRegistry
                     return _snapshot ?? KeywordSnapshot.Empty;
                 }
 
-                if (_snapshot is not null && string.Equals(_snapshot.Stamp, rebuilt.Stamp, StringComparison.Ordinal))
+                if (!string.Equals(_snapshot?.Stamp, rebuilt.Stamp, StringComparison.Ordinal))
                 {
-                    _dirty = false;
-                    return _snapshot;
+                    _logger.LogInformation(
+                        "Auto-link keyword registry rebuilt: {Cultures} culture set(s), {Count} keyword(s), stamp {Stamp}.",
+                        rebuilt.Cultures.Count,
+                        rebuilt.Cultures.Values.Sum(c => c.Targets.Count),
+                        rebuilt.Stamp);
                 }
-
-                _logger.LogInformation(
-                    "Auto-link keyword registry rebuilt: {Cultures} culture set(s), {Count} keyword(s), stamp {Stamp}.",
-                    rebuilt.Cultures.Count,
-                    rebuilt.Cultures.Values.Sum(c => c.Targets.Count),
-                    rebuilt.Stamp);
 
                 _snapshot = rebuilt;
                 _dirty = false;
@@ -281,9 +278,8 @@ internal sealed class KeywordRegistry : IKeywordRegistry
     private static bool IsRoutable(string? url) => !string.IsNullOrWhiteSpace(url) && url != "#";
 
     /// <summary>
-    /// Hashes every culture's resolved targets and suppressions together. Changes only when the linking behaviour
-    /// would actually differ, so a typo fix in body copy on a target page does not move the stamp, while a keyword
-    /// added in one language does.
+    /// Hashes every culture's keywords, URLs and suppressions together, so a typo fix in body copy on a target page
+    /// does not move the stamp, while a keyword added in one language does.
     /// </summary>
     internal static string ComputeStamp(IReadOnlyDictionary<string, CultureKeywordSet> sets)
     {

@@ -254,17 +254,10 @@ rather than a decision to hold ground for.
 `ComputeStamp` hashes every culture's resolved targets (keyword, URL, source) and suppressions into
 a SHA-256, truncated to 16 hex characters, using ASCII control characters as separators.
 
-The point is that a rebuild producing an identical hash **keeps the existing snapshot**:
-
-```csharp
-if (_snapshot is not null && string.Equals(_snapshot.Stamp, rebuilt.Stamp, StringComparison.Ordinal))
-{
-    _dirty = false;
-    return _snapshot;     // stamp does not move, downstream caches survive
-}
-```
-
-So a typo fix in body copy on a target page costs a rebuild and nothing else.
+It identifies which keyword set a scan report or overview was built against, so a typo fix in body
+copy on a target page leaves it where it was. Every rebuild swaps in its new snapshot regardless; the
+stamp only decides whether the rebuild is logged. It does not cover `rel` values or link titles, so
+it must not be used to decide whether rendered output is stale.
 
 A failed rebuild is caught and returns `KeywordSnapshot.Empty`, rendering unlinked rather than
 taking the site down.
