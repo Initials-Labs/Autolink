@@ -65,10 +65,12 @@ internal sealed class KeywordRegistry : IKeywordRegistry
                     return _snapshot ?? KeywordSnapshot.Empty;
                 }
 
+                _dirty = false;
                 KeywordSnapshot? rebuilt = Build();
 
                 if (rebuilt is null)
                 {
+                    _dirty = true;
                     _retryAfter = _time.GetUtcNow() + RetryDelay;
                     return _snapshot ?? KeywordSnapshot.Empty;
                 }
@@ -83,7 +85,6 @@ internal sealed class KeywordRegistry : IKeywordRegistry
                 }
 
                 _snapshot = rebuilt;
-                _dirty = false;
                 return rebuilt;
             }
         }

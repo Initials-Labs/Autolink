@@ -452,6 +452,10 @@ in the same commit.
 
 - Every rebuild swaps in its snapshot; the stamp decides only whether the rebuild is logged, so a publish that
   changes nothing about the keywords does not add a log line.
+- The dirty flag is cleared *before* the build reads the stores, not after. Cleared after, an `Invalidate()`
+  landing mid-build was wiped out and the change it announced waited for the next unrelated one. Consequence:
+  during a rebuild, other renders take the previous snapshot from the lock-free path instead of queueing on the
+  lock. That is the snapshot they would have got a moment earlier, and nothing waits on a rebuild any more.
 - The singleton registry resolves scoped services (stores, `IUmbracoContextFactory`, URL provider) from a fresh
   `IServiceScope` per rebuild. Blocking on the async `ILanguageService` is fine there: rebuilds happen on keyword
   changes, not per render, and there is no synchronisation context to deadlock against.

@@ -131,6 +131,26 @@ public class RegistryTests
         Assert.True(_registry.Current.For(null).Targets.ContainsKey(Keyword));
     }
 
+    [Fact]
+    public void An_invalidation_during_a_rebuild_is_not_lost()
+    {
+        int reads = 0;
+        _mappings.Configure().GetAll().Returns(_ =>
+        {
+            reads++;
+            if (reads == 1)
+            {
+                _registry.Invalidate();
+            }
+
+            string label = reads == 1 ? "Before" : "After";
+            return [new KeywordMapping(Keyword, Guid.Empty, Url, label, null, DateTime.UtcNow, "test", "")];
+        });
+
+        Assert.Equal("Before", Target().TargetName);
+        Assert.Equal("After", Target().TargetName);
+    }
+
     private sealed class ManualTime : TimeProvider
     {
         private DateTimeOffset _now = new(2026, 9, 24, 0, 0, 0, TimeSpan.Zero);
