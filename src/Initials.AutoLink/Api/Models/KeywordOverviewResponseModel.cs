@@ -75,6 +75,9 @@ public sealed class KeywordRowResponseModel
     /// <summary>Whether this external link overrides the configured rel default. Null follows it.</summary>
     public bool? Nofollow { get; init; }
 
+    /// <summary>Whether this external link opens in a new window. Null when the destination is a page.</summary>
+    public bool? OpenInNewWindow { get; init; }
+
     public DateTime? UpdateDate { get; init; }
 
     public string? UpdatedBy { get; init; }

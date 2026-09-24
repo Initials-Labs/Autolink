@@ -121,8 +121,8 @@ editor-supplied string the package puts in an href, so it is a security boundary
 ### 8. Keywords are managed centrally, not on document types
 
 The `linkKeywords` Tags property is gone. Keywords are created on the **Auto-linking** screen, and the destination
-is Umbraco's **Multi URL Picker** (`umb-input-multi-url`, capped at one item — how core does a single-link picker),
-which is what makes "a page" and "an outside URL" one decision made in one control.
+is Umbraco's **link picker modal** (`UMB_LINK_PICKER_MODAL`, the one behind the Multi URL Picker), which is what
+makes "a page" and "an outside URL" one decision made in one control.
 
 Decision 7 is what argued for this. A tag says "this page answers to this phrase", which reads well until you want
 a synonym, a plural, a phrase whose best target carries no tag, or a destination that is not a page at all. Every
@@ -144,9 +144,15 @@ Consequences to hold on to:
 - **`excludeFromAutoLinking` stayed on the document type.** "Do not scan this page's copy" is genuinely a property
   of the page, not of any keyword, so the schema installer still exists — for that one boolean.
 - **Teardown now destroys every keyword**, not just decisions layered over tags. There is no other copy.
-- The picker offers **media**, an **anchor**, and **open in new window**. The anchor is hidden, media is refused as
-  it is picked, and a set target prints a line saying it will not be used. Silently dropping editor input is the
-  thing being avoided in all three.
+- The picker offers **media**, an **anchor**, and **open in new window**. The anchor and the modal's target
+  toggle are hidden, and media is refused as it is picked. Silently dropping editor input is the thing being
+  avoided in all three.
+- **Open in new window is external-only**, as a checkbox of ours beside nofollow rather than the modal's toggle.
+  The modal has one toggle for both link types, and an auto-link into the site should behave like any other link
+  in the copy. `umb-input-multi-url` only forwards `hideAnchor` to the modal, never `hideTarget`, which is why
+  the dashboard opens the modal itself instead of using the input. The row stores `openInNewWindow`, the store
+  clears it for a page, and the linker only honours it inside the external branch, so all three layers refuse it
+  for internal links. A new-window link gets `noopener` added to whatever rel it already had.
 
 ### 9. Relations exist to make Umbraco do the warning
 
@@ -231,6 +237,12 @@ Bump on a **content hash of the built dictionary**, not on every publish of a ta
 doctype. Most target-page edits don't touch keywords or URLs, and a typo fix in body
 copy shouldn't nuke site-wide cached output. Build dictionary → hash keyword set +
 resolved URLs → only bump if different.
+
+**Built differently.** The stamp-keyed cache it was meant to protect was measured as unnecessary and never
+built, so the registry always swaps in the rebuilt snapshot and the stamp is only an identifier on the report and
+overview. Keeping the old snapshot on an equal hash was tried and was a bug: the hash leaves out `rel` and link
+titles, so a nofollow toggle, a label change or a target rename never reached the page. If that cache is ever
+built, key it on a hash of everything the anchor carries, not this one.
 
 Hooked from `ContentCacheRefresherNotification`, not from the publish/unpublish/delete notifications the original
 design named — the field notes below have the two production reasons (cache settling, and other servers).
@@ -444,16 +456,21 @@ in the same commit.
 
 ### Registry and invalidation
 
-- The rebuilt snapshot is only swapped in when its content hash differs, so re-saving the same destination or
-  publishing an unrelated edit on a target page holds the stamp still and invalidates nothing downstream.
+- Every rebuild swaps in its snapshot; the stamp decides only whether the rebuild is logged, so a publish that
+  changes nothing about the keywords does not add a log line.
+- The dirty flag is cleared *before* the build reads the stores, not after. Cleared after, an `Invalidate()`
+  landing mid-build was wiped out and the change it announced waited for the next unrelated one. Consequence:
+  during a rebuild, other renders take the previous snapshot from the lock-free path instead of queueing on the
+  lock. That is the snapshot they would have got a moment earlier, and nothing waits on a rebuild any more.
 - The singleton registry resolves scoped services (stores, `IUmbracoContextFactory`, URL provider) from a fresh
   `IServiceScope` per rebuild. Blocking on the async `ILanguageService` is fine there: rebuilds happen on keyword
   changes, not per render, and there is no synchronisation context to deadlock against.
 - One `IContentService.GetByIds` fetches every target page, shared across cultures; `GetCultureName` returns
-  null for a non-varying page, hence the `Name` fallback. A failed rebuild logs and keeps the last good snapshot,
-  marked clean — a transient database error must not downgrade a working site to unlinked, and retrying on every
-  render would hammer a database that is already failing. The first build failing serves the empty snapshot.
-  Either way the registry stays put until the next invalidation, so a failure is not self-healing.
+  null for a non-varying page, hence the `Name` fallback. A failed rebuild logs, keeps serving the last good
+  snapshot (empty only if there never was one) and stays dirty, retrying no sooner than 30 seconds later. It
+  used to swap in the empty snapshot and mark itself clean, so one database blip unlinked the whole site until
+  the next publish. The delay is there because rebuilds happen under a lock on the render path, and retrying on
+  every render during an outage would queue every page behind a database timeout.
 - `RelFor` is one rule: the configured `ExternalLinkRel` tokens go on every external link, and a row's `Nofollow`
   adds or removes that single token. The first version only applied the configured string when it contained
   "nofollow", so configuring `noopener` alone produced no `rel` at all.
@@ -465,9 +482,12 @@ in the same commit.
 
 ### Persistence
 
-- A missing table (migration not yet run) degrades instead of throwing: the mapping store returns no keywords
-  (site behaves as if the package were absent), the suppression store returns none (a link that should be
-  suppressed is visible and fixable). Both are survivable in a way a failed request is not.
+- A missing table (migration not yet run, or torn down) degrades instead of throwing: the mapping store returns
+  no keywords (site behaves as if the package were absent), the suppression store returns none (a link that
+  should be suppressed is visible and fixable). Both are survivable in a way a failed request is not. **Only**
+  a missing table: any other read failure throws, and the table check runs only after a read fails, so the
+  happy path costs nothing. Swallowing every error used to hand the registry an empty set it could not tell
+  from a real one. Every caller of `GetAll` other than the registry already catches.
 - The stores invalidate the registry themselves — they are the code that knows rows changed, and an invalidation
   nobody sends leaves other servers resolving the old way until the next content change.
 - `keywordKey` is stored lower-cased next to the display-cased `keyword` because SQLite text comparison is

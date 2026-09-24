@@ -23,8 +23,8 @@ public sealed class KeywordSnapshot
     public IReadOnlyDictionary<string, CultureKeywordSet> Cultures { get; }
 
     /// <summary>
-    /// Content hash across every culture. Changes only when the linking behaviour or the choices on offer would
-    /// actually differ, so a typo fix in body copy on a target page does not invalidate anything.
+    /// Content hash of every culture's keywords, URLs and suppressions, identifying which keyword set a report was
+    /// built against. Link titles and rel values are not part of it.
     /// </summary>
     public string Stamp { get; }
 

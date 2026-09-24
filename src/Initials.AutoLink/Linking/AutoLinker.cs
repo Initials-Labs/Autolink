@@ -290,6 +290,11 @@ internal sealed class AutoLinker : IAutoLinker
                 {
                     anchor.SetAttribute("rel", rel);
                 }
+
+                if (target.OpenInNewWindow)
+                {
+                    anchor.SetAttribute("target", "_blank");
+                }
             }
 
             anchor.TextContent = match.Value;

@@ -23,6 +23,7 @@ internal sealed class AutoLinkMigrationPlan : MigrationPlan
             .To<AddCultureToDecisions>("autolink-decisions-culture")
             .To<AddExternalLinkColumns>("autolink-external-links")
             .To<AddKeywordRelationType>("autolink-relation-type")
-            .To<RemoveLegacyKeywordProperty>("autolink-remove-legacy-keyword-property");
+            .To<RemoveLegacyKeywordProperty>("autolink-remove-legacy-keyword-property")
+            .To<AddOpenInNewWindowColumn>("autolink-open-in-new-window");
     }
 }

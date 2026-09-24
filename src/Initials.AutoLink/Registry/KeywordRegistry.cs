@@ -21,19 +21,25 @@ internal sealed class KeywordRegistry : IKeywordRegistry
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IOptionsMonitor<AutoLinkOptions> _options;
     private readonly ILogger<KeywordRegistry> _logger;
+    private readonly TimeProvider _time;
+
+    private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(30);
 
     private readonly Lock _lock = new();
     private KeywordSnapshot? _snapshot;
     private volatile bool _dirty = true;
+    private DateTimeOffset _retryAfter = DateTimeOffset.MinValue;
 
     public KeywordRegistry(
         IServiceScopeFactory scopeFactory,
         IOptionsMonitor<AutoLinkOptions> options,
-        ILogger<KeywordRegistry> logger)
+        ILogger<KeywordRegistry> logger,
+        TimeProvider time)
     {
         _scopeFactory = scopeFactory;
         _options = options;
         _logger = logger;
+        _time = time;
     }
 
     /// <inheritdoc />
@@ -54,28 +60,31 @@ internal sealed class KeywordRegistry : IKeywordRegistry
                     return _snapshot;
                 }
 
+                if (_time.GetUtcNow() < _retryAfter)
+                {
+                    return _snapshot ?? KeywordSnapshot.Empty;
+                }
+
+                _dirty = false;
                 KeywordSnapshot? rebuilt = Build();
 
                 if (rebuilt is null)
                 {
-                    _dirty = false;
+                    _dirty = true;
+                    _retryAfter = _time.GetUtcNow() + RetryDelay;
                     return _snapshot ?? KeywordSnapshot.Empty;
                 }
 
-                if (_snapshot is not null && string.Equals(_snapshot.Stamp, rebuilt.Stamp, StringComparison.Ordinal))
+                if (!string.Equals(_snapshot?.Stamp, rebuilt.Stamp, StringComparison.Ordinal))
                 {
-                    _dirty = false;
-                    return _snapshot;
+                    _logger.LogInformation(
+                        "Auto-link keyword registry rebuilt: {Cultures} culture set(s), {Count} keyword(s), stamp {Stamp}.",
+                        rebuilt.Cultures.Count,
+                        rebuilt.Cultures.Values.Sum(c => c.Targets.Count),
+                        rebuilt.Stamp);
                 }
 
-                _logger.LogInformation(
-                    "Auto-link keyword registry rebuilt: {Cultures} culture set(s), {Count} keyword(s), stamp {Stamp}.",
-                    rebuilt.Cultures.Count,
-                    rebuilt.Cultures.Values.Sum(c => c.Targets.Count),
-                    rebuilt.Stamp);
-
                 _snapshot = rebuilt;
-                _dirty = false;
                 return rebuilt;
             }
         }
@@ -85,8 +94,7 @@ internal sealed class KeywordRegistry : IKeywordRegistry
     public void Invalidate() => _dirty = true;
 
     /// <summary>
-    /// Builds every culture's keyword set from the stored keyword rows. Null when the build failed, so the caller
-    /// can keep serving the last good snapshot.
+    /// Builds every culture's keyword set from the stored keyword rows, or null when that fails.
     /// </summary>
     private KeywordSnapshot? Build()
     {
@@ -125,7 +133,10 @@ internal sealed class KeywordRegistry : IKeywordRegistry
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to build the auto-link keyword registry. Keeping the previous keyword set until the next change.");
+            _logger.LogError(
+                ex,
+                "Failed to build the auto-link keyword registry. Keeping the last keyword set and retrying in {Delay}.",
+                RetryDelay);
             return null;
         }
 
@@ -220,7 +231,10 @@ internal sealed class KeywordRegistry : IKeywordRegistry
                     external,
                     mapping.Label is { Length: > 0 } label ? label : ExternalUrl.Describe(external),
                     KeywordSource.External,
-                    RelFor(mapping.Nofollow, options.ExternalLinkRel));
+                    RelFor(mapping.Nofollow, options.ExternalLinkRel, mapping.OpenInNewWindow))
+                {
+                    OpenInNewWindow = mapping.OpenInNewWindow,
+                };
             }
 
             _logger.LogWarning(
@@ -258,9 +272,9 @@ internal sealed class KeywordRegistry : IKeywordRegistry
 
     /// <summary>
     /// The rel attribute for an external link: the configured tokens, with the row's nofollow choice adding or
-    /// removing that one token. Null when nothing is left.
+    /// removing that one token, and noopener added when it opens in a new window. Null when nothing is left.
     /// </summary>
-    internal static string? RelFor(bool? nofollow, string configuredRel)
+    internal static string? RelFor(bool? nofollow, string configuredRel, bool openInNewWindow = false)
     {
         var tokens = new List<string>(
             configuredRel.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
@@ -275,15 +289,19 @@ internal sealed class KeywordRegistry : IKeywordRegistry
             }
         }
 
+        if (openInNewWindow && !tokens.Contains("noopener", StringComparer.OrdinalIgnoreCase))
+        {
+            tokens.Add("noopener");
+        }
+
         return tokens.Count == 0 ? null : string.Join(' ', tokens);
     }
 
     private static bool IsRoutable(string? url) => !string.IsNullOrWhiteSpace(url) && url != "#";
 
     /// <summary>
-    /// Hashes every culture's resolved targets and suppressions together. Changes only when the linking behaviour
-    /// would actually differ, so a typo fix in body copy on a target page does not move the stamp, while a keyword
-    /// added in one language does.
+    /// Hashes every culture's keywords, URLs and suppressions together, so a typo fix in body copy on a target page
+    /// does not move the stamp, while a keyword added in one language does.
     /// </summary>
     internal static string ComputeStamp(IReadOnlyDictionary<string, CultureKeywordSet> sets)
     {

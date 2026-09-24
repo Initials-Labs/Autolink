@@ -21,6 +21,9 @@ public sealed record KeywordMapping(
     string? UpdatedBy,
     string Culture)
 {
+    /// <summary>Opens an external link in a new window. Always false for a page.</summary>
+    public bool OpenInNewWindow { get; init; }
+
     /// <summary>Points outside the site rather than at a page.</summary>
     public bool IsExternal => !string.IsNullOrEmpty(ExternalUrl);
 

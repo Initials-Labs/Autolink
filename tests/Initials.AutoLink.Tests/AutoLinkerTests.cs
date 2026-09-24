@@ -151,6 +151,39 @@ public class AutoLinkerTests
     }
 
     [Fact]
+    public void An_external_link_can_open_in_a_new_window()
+    {
+        AutoLinker linker = TestLinker.Create(TestLinker.Set(
+            TestLinker.External("Umbraco", "https://umbraco.com") with { OpenInNewWindow = true }));
+
+        string result = linker.ProcessMarkup("<p>Umbraco is over there.</p>");
+
+        Assert.Contains("target=\"_blank\"", result);
+    }
+
+    [Fact]
+    public void An_external_link_stays_in_the_window_by_default()
+    {
+        AutoLinker linker = TestLinker.Create(
+            TestLinker.Set(TestLinker.External("Umbraco", "https://umbraco.com")));
+
+        string result = linker.ProcessMarkup("<p>Umbraco is over there.</p>");
+
+        Assert.DoesNotContain("target=", result);
+    }
+
+    [Fact]
+    public void An_internal_link_never_opens_a_new_window()
+    {
+        AutoLinker linker = TestLinker.Create(TestLinker.Set(
+            TestLinker.Page("Umbraco") with { OpenInNewWindow = true }));
+
+        string result = linker.ProcessMarkup("<p>Umbraco is here.</p>");
+
+        Assert.DoesNotContain("target=", result);
+    }
+
+    [Fact]
     public void Internal_links_carry_no_external_markers()
     {
         AutoLinker linker = TestLinker.Create(TestLinker.Set(TestLinker.Page("Umbraco")));

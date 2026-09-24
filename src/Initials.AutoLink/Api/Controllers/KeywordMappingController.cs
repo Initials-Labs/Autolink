@@ -91,6 +91,7 @@ public sealed class KeywordMappingController : AutoLinkControllerBase
             ExternalUrl = mapping.ExternalUrl,
             Label = mapping.Label,
             Nofollow = mapping.Nofollow,
+            OpenInNewWindow = mapping.IsExternal ? mapping.OpenInNewWindow : null,
             UpdateDate = mapping.UpdateDate,
             UpdatedBy = mapping.UpdatedBy,
             MappingCulture = mapping.Culture,
@@ -132,7 +133,7 @@ public sealed class KeywordMappingController : AutoLinkControllerBase
                 return BadRequest("An external link must be an absolute http or https URL.");
             }
 
-            destination = KeywordDestination.External(url, model.Label?.Trim(), model.Nofollow);
+            destination = KeywordDestination.External(url, model.Label?.Trim(), model.Nofollow, model.OpenInNewWindow);
         }
         else
         {

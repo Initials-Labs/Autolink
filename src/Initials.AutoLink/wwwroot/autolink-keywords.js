@@ -2,9 +2,9 @@ import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import { html, css, nothing, repeat, when } from '@umbraco-cms/backoffice/external/lit';
 import { UMB_AUTH_CONTEXT } from '@umbraco-cms/backoffice/auth';
 import { UMB_NOTIFICATION_CONTEXT } from '@umbraco-cms/backoffice/notification';
+import { umbOpenModal } from '@umbraco-cms/backoffice/modal';
+import { UMB_LINK_PICKER_MODAL } from '@umbraco-cms/backoffice/multi-url-picker';
 import '@umbraco-cms/backoffice/external/uui';
-
-import '@umbraco-cms/backoffice/multi-url-picker';
 
 const API = '/umbraco/management/api/v1/autolink';
 const EVERYWHERE = '00000000-0000-0000-0000-000000000000';
@@ -31,7 +31,7 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 		_formLink: { state: true },
 		_formLabel: { state: true },
 		_formNofollow: { state: true },
-		_formTargetNoticed: { state: true },
+		_formNewWindow: { state: true },
 	};
 
 	#notifications;
@@ -254,7 +254,7 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 		this._formLink = null;
 		this._formLabel = '';
 		this._formNofollow = true;
-		this._formTargetNoticed = false;
+		this._formNewWindow = false;
 	}
 
 	#formOpen() {
@@ -272,6 +272,7 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 		this._formKeyword = row.keyword;
 		this._formLabel = row.label ?? '';
 		this._formNofollow = row.nofollow ?? true;
+		this._formNewWindow = row.openInNewWindow ?? false;
 		this._formLink = row.externalUrl
 			? { type: 'external', url: row.externalUrl, name: row.label ?? '' }
 			: row.targetKey
@@ -279,20 +280,28 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 				: null;
 	}
 
-	#onLinkChange(event) {
-		const link = event.target.urls?.[0] ?? null;
+	async #pickLink() {
+		const result = await umbOpenModal(this, UMB_LINK_PICKER_MODAL, {
+			modal: { size: 'small' },
+			data: {
+				index: null,
+				isNew: !this._formLink,
+				config: { hideAnchor: true, hideTarget: true },
+			},
+			value: { link: { ...(this._formLink ?? {}) } },
+		}).catch(() => undefined);
 
-		if (link?.type === 'media') {
-			event.target.urls = [];
-			this._formLink = null;
-			this._formTargetNoticed = false;
+		const link = result?.link;
+		if (!link) {
+			return;
+		}
+
+		if (link.type === 'media') {
 			this.#notify('warning', this.localize.term('initialsAutoLink_mediaNotSupported'));
 			return;
 		}
 
 		this._formLink = link;
-
-		this._formTargetNoticed = Boolean(link?.target);
 	}
 
 	#linkIsExternal(link) {
@@ -323,6 +332,7 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 			body.externalUrl = url;
 			body.label = this._formLabel.trim() || link.name || null;
 			body.nofollow = this._formNofollow;
+			body.openInNewWindow = this._formNewWindow;
 			destination = body.label || url;
 		} else {
 			body.targetKey = link.unique;
@@ -492,11 +502,30 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 
 					<div class="field">
 						<span class="field-label">${this.localize.term('initialsAutoLink_fieldDestination')}</span>
-						<umb-input-multi-url
-							max="1"
-							hide-anchor
-							.urls=${this._formLink ? [this._formLink] : []}
-							@change=${(event) => this.#onLinkChange(event)}></umb-input-multi-url>
+						${this._formLink
+							? html`
+									<uui-ref-node
+										standalone
+										name=${this._formLink.name || this._formLink.url || ''}
+										detail=${this._formLink.url ?? ''}>
+										<uui-action-bar slot="actions">
+											<uui-button
+												label=${this.localize.term('general_edit')}
+												@click=${() => this.#pickLink()}></uui-button>
+											<uui-button
+												label=${this.localize.term('general_remove')}
+												@click=${() => {
+													this._formLink = null;
+												}}></uui-button>
+										</uui-action-bar>
+									</uui-ref-node>
+								`
+							: html`
+									<uui-button
+										look="placeholder"
+										label=${this.localize.term('general_choose')}
+										@click=${() => this.#pickLink()}></uui-button>
+								`}
 					</div>
 				</div>
 
@@ -525,12 +554,17 @@ export default class InitialsAutoLinkKeywordsElement extends UmbLitElement {
 								}} />
 							${this.localize.term('initialsAutoLink_nofollowLabel')}
 						</label>
-					`,
-				)}
 
-				${when(
-					this._formTargetNoticed,
-					() => html`<p class="muted">${this.localize.term('initialsAutoLink_targetNotUsed')}</p>`,
+						<label class="form-follow">
+							<input
+								type="checkbox"
+								.checked=${this._formNewWindow}
+								@change=${(event) => {
+									this._formNewWindow = event.target.checked;
+								}} />
+							${this.localize.term('initialsAutoLink_newWindowLabel')}
+						</label>
+					`,
 				)}
 
 				<div>

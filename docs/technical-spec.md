@@ -254,20 +254,16 @@ rather than a decision to hold ground for.
 `ComputeStamp` hashes every culture's resolved targets (keyword, URL, source) and suppressions into
 a SHA-256, truncated to 16 hex characters, using ASCII control characters as separators.
 
-The point is that a rebuild producing an identical hash **keeps the existing snapshot**:
+It identifies which keyword set a scan report or overview was built against, so a typo fix in body
+copy on a target page leaves it where it was. Every rebuild swaps in its new snapshot regardless; the
+stamp only decides whether the rebuild is logged. It does not cover `rel` values or link titles, so
+it must not be used to decide whether rendered output is stale.
 
-```csharp
-if (_snapshot is not null && string.Equals(_snapshot.Stamp, rebuilt.Stamp, StringComparison.Ordinal))
-{
-    _dirty = false;
-    return _snapshot;     // stamp does not move, downstream caches survive
-}
-```
-
-So a typo fix in body copy on a target page costs a rebuild and nothing else.
-
-A failed rebuild is caught and returns `KeywordSnapshot.Empty`, rendering unlinked rather than
-taking the site down.
+A failed rebuild is caught and the last good snapshot keeps being served (`KeywordSnapshot.Empty`
+if there never was one). The registry stays dirty and retries no sooner than 30 seconds later, so
+an outage does not put a database call on every render. The stores throw on any read failure
+other than a missing table, so a failure reaches the registry as one rather than as an empty
+keyword set.
 
 ---
 
@@ -316,6 +312,7 @@ The only source of keywords.
 | `externalUrl` | nvarchar(2048) null | Absolute http(s), or null for a page |
 | `label` | nvarchar(255) null | External anchor title, defaults to host |
 | `nofollow` | bit null | Null follows configuration |
+| `openInNewWindow` | bit | External links only; always false for a page |
 | `updateDate` | datetime | |
 | `updatedBy` | nvarchar(255) null | |
 
@@ -617,15 +614,14 @@ Notable points:
 - **It does not use `umbHttpClient`.** That client routes failures through backoffice error
   handling, where a 401 from a package endpoint is indistinguishable from a dead session and signs
   the user out. It carries its own token from `UMB_AUTH_CONTEXT` and renders its own errors.
-- The destination field is `umb-input-multi-url` from `@umbraco-cms/backoffice/multi-url-picker`,
-  the input behind `Umbraco.MultiUrlPicker`, with `max="1"` and `hide-anchor`. A document pick
-  yields `unique` (the page key); anything else is treated as external.
-- Its modal is a **route**, needing `UMB_ROUTE_CONTEXT`. That resolves because
-  `umb-section-main-views` renders dashboards inside `umb-router-slot`.
+- The destination field opens `UMB_LINK_PICKER_MODAL` from `@umbraco-cms/backoffice/multi-url-picker`
+  directly, via `umbOpenModal`, with `hideAnchor` and `hideTarget`. `umb-input-multi-url` was used
+  before, but it forwards only `hideAnchor` to the modal. A document pick yields `unique` (the page
+  key); anything else is treated as external. The chosen link shows as a `uui-ref-node`.
 - A **media** pick is refused on change with a message, because a media URL is site-relative and
-  `ExternalUrl` deliberately requires absolute http(s). "Open in new window" cannot be hidden on
-  either the input or the built-in property editor, so a set target prints a line saying it will not
-  be used.
+  `ExternalUrl` deliberately requires absolute http(s).
+- **Open in a new window** is a checkbox beside nofollow, shown only for an external link. It renders
+  `target="_blank"` and adds `noopener` to the rel.
 - **List semantics, not table roles.** It looks like a table, but each row contains its own detail
   panel and no table role permits that.
 - Every string lives in `wwwroot/lang/en.js`. A term taking values is a **function**; the pre-v14

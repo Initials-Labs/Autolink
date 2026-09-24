@@ -5,7 +5,10 @@ namespace Initials.AutoLink.Persistence;
 /// </summary>
 public interface IKeywordMappingStore
 {
-    /// <summary>Every stored keyword. Called once per registry rebuild, not per render.</summary>
+    /// <summary>
+    /// Every stored keyword. Called once per registry rebuild, not per render. Empty before the table exists; throws
+    /// if it exists and cannot be read.
+    /// </summary>
     IReadOnlyList<KeywordMapping> GetAll();
 
     /// <summary>
