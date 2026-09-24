@@ -231,7 +231,10 @@ internal sealed class KeywordRegistry : IKeywordRegistry
                     external,
                     mapping.Label is { Length: > 0 } label ? label : ExternalUrl.Describe(external),
                     KeywordSource.External,
-                    RelFor(mapping.Nofollow, options.ExternalLinkRel));
+                    RelFor(mapping.Nofollow, options.ExternalLinkRel, mapping.OpenInNewWindow))
+                {
+                    OpenInNewWindow = mapping.OpenInNewWindow,
+                };
             }
 
             _logger.LogWarning(
@@ -269,9 +272,9 @@ internal sealed class KeywordRegistry : IKeywordRegistry
 
     /// <summary>
     /// The rel attribute for an external link: the configured tokens, with the row's nofollow choice adding or
-    /// removing that one token. Null when nothing is left.
+    /// removing that one token, and noopener added when it opens in a new window. Null when nothing is left.
     /// </summary>
-    internal static string? RelFor(bool? nofollow, string configuredRel)
+    internal static string? RelFor(bool? nofollow, string configuredRel, bool openInNewWindow = false)
     {
         var tokens = new List<string>(
             configuredRel.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
@@ -284,6 +287,11 @@ internal sealed class KeywordRegistry : IKeywordRegistry
             {
                 tokens.Insert(0, "nofollow");
             }
+        }
+
+        if (openInNewWindow && !tokens.Contains("noopener", StringComparer.OrdinalIgnoreCase))
+        {
+            tokens.Add("noopener");
         }
 
         return tokens.Count == 0 ? null : string.Join(' ', tokens);

@@ -67,12 +67,12 @@ export default {
 		fieldTitle: 'Title',
 		fieldTitleHint: 'Optional title, defaults to the host',
 		nofollowLabel: 'Add rel="nofollow", so a wall of outbound links does not read as a link scheme',
+		newWindowLabel: 'Open in a new window',
 		saveKeyword: 'Save keyword',
 		thePage: 'the page',
 		needsKeywordAndDestination: 'A keyword and a destination are both needed.',
 		notAbsoluteUrl: 'An address outside the site has to start with http:// or https://.',
 		mediaNotSupported: 'A keyword can link to a page or to an address outside the site. Media is not supported.',
-		targetNotUsed: 'Auto-links never open a new window, so that choice will not be used.',
 
 		noKeywords: (language) =>
 			`No keywords in ${language} yet. Add one, and every page whose copy already writes that word links to it the next time it renders.`,

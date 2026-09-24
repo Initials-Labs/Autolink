@@ -28,6 +28,12 @@ public sealed record KeywordTarget(
     string? Rel = null,
     bool VariesByCulture = false)
 {
+    /// <summary>
+    /// Opens in a new window. Only honoured for an external link: an auto-link into the site behaves like any other
+    /// link in the copy.
+    /// </summary>
+    public bool OpenInNewWindow { get; init; }
+
     /// <summary>Points outside the site, so there is no page behind it.</summary>
     public bool IsExternal => Source == KeywordSource.External;
 }

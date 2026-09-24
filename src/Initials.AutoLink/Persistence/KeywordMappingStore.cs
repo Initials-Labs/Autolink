@@ -60,7 +60,10 @@ internal sealed class KeywordMappingStore : IKeywordMappingStore
                 dto.Nofollow,
                 dto.UpdateDate,
                 dto.UpdatedBy,
-                dto.Culture ?? string.Empty))
+                dto.Culture ?? string.Empty)
+            {
+                OpenInNewWindow = dto.OpenInNewWindow,
+            })
             .ToList();
     }
 
@@ -142,6 +145,7 @@ internal sealed class KeywordMappingStore : IKeywordMappingStore
         dto.ExternalUrl = destination.IsExternal ? destination.ExternalUrl : null;
         dto.Label = destination.IsExternal ? destination.Label : null;
         dto.Nofollow = destination.IsExternal ? destination.Nofollow : null;
+        dto.OpenInNewWindow = destination.IsExternal && destination.OpenInNewWindow;
         dto.UpdateDate = DateTime.UtcNow;
         dto.UpdatedBy = updatedBy;
 

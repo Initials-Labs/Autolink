@@ -55,8 +55,11 @@ public class RegistryTests
             _time);
     }
 
-    private void Stored(string? label = null, bool? nofollow = null) =>
-        _mappings.Configure().GetAll().Returns([new KeywordMapping(Keyword, Guid.Empty, Url, label, nofollow, DateTime.UtcNow, "test", "")]);
+    private void Stored(string? label = null, bool? nofollow = null, bool newWindow = false) =>
+        _mappings.Configure().GetAll().Returns([new KeywordMapping(Keyword, Guid.Empty, Url, label, nofollow, DateTime.UtcNow, "test", "")
+        {
+            OpenInNewWindow = newWindow,
+        }]);
 
     private Models.KeywordTarget Target() => _registry.Current.For(null).Targets[Keyword];
 
@@ -149,6 +152,35 @@ public class RegistryTests
 
         Assert.Equal("Before", Target().TargetName);
         Assert.Equal("After", Target().TargetName);
+    }
+
+    [Fact]
+    public void A_new_window_link_adds_noopener_to_the_configured_rel()
+    {
+        Stored(newWindow: true);
+
+        Assert.True(Target().OpenInNewWindow);
+        Assert.Equal("nofollow noopener", Target().Rel);
+    }
+
+    [Fact]
+    public void A_new_window_link_without_nofollow_still_carries_noopener()
+    {
+        Stored(nofollow: false, newWindow: true);
+
+        Assert.Equal("noopener", Target().Rel);
+    }
+
+    [Fact]
+    public void A_new_window_change_reaches_the_renderer()
+    {
+        Stored(newWindow: false);
+        Assert.False(Target().OpenInNewWindow);
+
+        Stored(newWindow: true);
+        _registry.Invalidate();
+
+        Assert.True(Target().OpenInNewWindow);
     }
 
     private sealed class ManualTime : TimeProvider

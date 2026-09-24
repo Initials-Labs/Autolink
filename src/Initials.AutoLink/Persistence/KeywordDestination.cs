@@ -22,10 +22,16 @@ public sealed record KeywordDestination
 
     public bool? Nofollow { get; private init; }
 
+    /// <summary>Opens the link in a new window. Only an external destination can.</summary>
+    public bool OpenInNewWindow { get; private init; }
+
     public bool IsExternal => !string.IsNullOrEmpty(ExternalUrl);
 
     public static KeywordDestination Page(Guid targetKey) => new() { TargetKey = targetKey };
 
     public static KeywordDestination External(string url, string? label, bool? nofollow) =>
-        new() { ExternalUrl = url, Label = label, Nofollow = nofollow };
+        External(url, label, nofollow, openInNewWindow: false);
+
+    public static KeywordDestination External(string url, string? label, bool? nofollow, bool openInNewWindow) =>
+        new() { ExternalUrl = url, Label = label, Nofollow = nofollow, OpenInNewWindow = openInNewWindow };
 }

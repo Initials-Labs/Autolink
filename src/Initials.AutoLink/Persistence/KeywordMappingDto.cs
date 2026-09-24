@@ -64,6 +64,10 @@ internal sealed class KeywordMappingDto
     [NullSetting(NullSetting = NullSettings.Null)]
     public bool? Nofollow { get; set; }
 
+    /// <summary>Opens an external link in a new window. Always false for a page.</summary>
+    [Column("openInNewWindow")]
+    public bool OpenInNewWindow { get; set; }
+
     [Column("updateDate")]
     public DateTime UpdateDate { get; set; }
 

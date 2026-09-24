@@ -121,8 +121,8 @@ editor-supplied string the package puts in an href, so it is a security boundary
 ### 8. Keywords are managed centrally, not on document types
 
 The `linkKeywords` Tags property is gone. Keywords are created on the **Auto-linking** screen, and the destination
-is Umbraco's **Multi URL Picker** (`umb-input-multi-url`, capped at one item — how core does a single-link picker),
-which is what makes "a page" and "an outside URL" one decision made in one control.
+is Umbraco's **link picker modal** (`UMB_LINK_PICKER_MODAL`, the one behind the Multi URL Picker), which is what
+makes "a page" and "an outside URL" one decision made in one control.
 
 Decision 7 is what argued for this. A tag says "this page answers to this phrase", which reads well until you want
 a synonym, a plural, a phrase whose best target carries no tag, or a destination that is not a page at all. Every
@@ -144,9 +144,15 @@ Consequences to hold on to:
 - **`excludeFromAutoLinking` stayed on the document type.** "Do not scan this page's copy" is genuinely a property
   of the page, not of any keyword, so the schema installer still exists — for that one boolean.
 - **Teardown now destroys every keyword**, not just decisions layered over tags. There is no other copy.
-- The picker offers **media**, an **anchor**, and **open in new window**. The anchor is hidden, media is refused as
-  it is picked, and a set target prints a line saying it will not be used. Silently dropping editor input is the
-  thing being avoided in all three.
+- The picker offers **media**, an **anchor**, and **open in new window**. The anchor and the modal's target
+  toggle are hidden, and media is refused as it is picked. Silently dropping editor input is the thing being
+  avoided in all three.
+- **Open in new window is external-only**, as a checkbox of ours beside nofollow rather than the modal's toggle.
+  The modal has one toggle for both link types, and an auto-link into the site should behave like any other link
+  in the copy. `umb-input-multi-url` only forwards `hideAnchor` to the modal, never `hideTarget`, which is why
+  the dashboard opens the modal itself instead of using the input. The row stores `openInNewWindow`, the store
+  clears it for a page, and the linker only honours it inside the external branch, so all three layers refuse it
+  for internal links. A new-window link gets `noopener` added to whatever rel it already had.
 
 ### 9. Relations exist to make Umbraco do the warning
 

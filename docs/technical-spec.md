@@ -312,6 +312,7 @@ The only source of keywords.
 | `externalUrl` | nvarchar(2048) null | Absolute http(s), or null for a page |
 | `label` | nvarchar(255) null | External anchor title, defaults to host |
 | `nofollow` | bit null | Null follows configuration |
+| `openInNewWindow` | bit | External links only; always false for a page |
 | `updateDate` | datetime | |
 | `updatedBy` | nvarchar(255) null | |
 
@@ -613,15 +614,14 @@ Notable points:
 - **It does not use `umbHttpClient`.** That client routes failures through backoffice error
   handling, where a 401 from a package endpoint is indistinguishable from a dead session and signs
   the user out. It carries its own token from `UMB_AUTH_CONTEXT` and renders its own errors.
-- The destination field is `umb-input-multi-url` from `@umbraco-cms/backoffice/multi-url-picker`,
-  the input behind `Umbraco.MultiUrlPicker`, with `max="1"` and `hide-anchor`. A document pick
-  yields `unique` (the page key); anything else is treated as external.
-- Its modal is a **route**, needing `UMB_ROUTE_CONTEXT`. That resolves because
-  `umb-section-main-views` renders dashboards inside `umb-router-slot`.
+- The destination field opens `UMB_LINK_PICKER_MODAL` from `@umbraco-cms/backoffice/multi-url-picker`
+  directly, via `umbOpenModal`, with `hideAnchor` and `hideTarget`. `umb-input-multi-url` was used
+  before, but it forwards only `hideAnchor` to the modal. A document pick yields `unique` (the page
+  key); anything else is treated as external. The chosen link shows as a `uui-ref-node`.
 - A **media** pick is refused on change with a message, because a media URL is site-relative and
-  `ExternalUrl` deliberately requires absolute http(s). "Open in new window" cannot be hidden on
-  either the input or the built-in property editor, so a set target prints a line saying it will not
-  be used.
+  `ExternalUrl` deliberately requires absolute http(s).
+- **Open in a new window** is a checkbox beside nofollow, shown only for an external link. It renders
+  `target="_blank"` and adds `noopener` to the rel.
 - **List semantics, not table roles.** It looks like a table, but each row contains its own detail
   panel and no table role permits that.
 - Every string lives in `wwwroot/lang/en.js`. A term taking values is a **function**; the pre-v14

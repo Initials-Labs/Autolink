@@ -25,6 +25,9 @@ public sealed class SaveKeywordMappingRequestModel
     /// <summary>Adds or removes the nofollow token from the configured rel for this link. Null leaves it as configured.</summary>
     public bool? Nofollow { get; init; }
 
+    /// <summary>Opens an external link in a new window. Ignored for a page.</summary>
+    public bool OpenInNewWindow { get; init; }
+
     /// <summary>
     /// Culture the keyword applies to, or empty for every culture. The same word in two languages can point at two
     /// different pages, so each is its own row.
